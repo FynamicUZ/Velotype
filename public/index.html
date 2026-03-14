@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Velotype</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="screen active">
+            <div class="auth-box">
+                <h1>VELOTYPE</h1>
+                <h2>Welcome Back</h2>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="login-email" placeholder="name@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="login-password" placeholder="••••••••">
+                </div>
+                <button id="login-btn">Log In</button>
+                <div class="separator">or</div>
+                <button id="google-login-btn" class="google-btn">
+                    <img src="https://www.google.com/favicon.ico" width="16" height="16">
+                    Connect Google Account
+                </button>
+                <p class="small-text" style="margin-top: 1.5rem; text-align: center;">
+                    Don't have an account? <button class="text-btn" id="show-signup-btn">Sign Up</button>
+                </p>
+                <p id="login-error" class="error-text hidden"></p>
+            </div>
+        </div>
+
+        <!-- Signup Screen -->
+        <div id="signup-screen" class="screen">
+            <div class="auth-box">
+                <h1>VELOTYPE</h1>
+                <h2>Create Account</h2>
+                <div class="input-group">
+                    <label>Username</label>
+                    <input type="text" id="signup-username" placeholder="Alex">
+                </div>
+                <div class="input-group">
+                    <label>Email</label>
+                    <input type="email" id="signup-email" placeholder="name@example.com">
+                </div>
+                <div class="input-group">
+                    <label>Password</label>
+                    <input type="password" id="signup-password" placeholder="••••••••">
+                </div>
+                <button id="signup-submit-btn">Continue to Path Selection</button>
+                <p class="small-text" style="margin-top: 1.5rem; text-align: center;">
+                    Already have an account? <button class="text-btn" id="show-login-btn">Log In</button>
+                </p>
+                <p id="signup-error" class="error-text hidden"></p>
+            </div>
+        </div>
+
+        <!-- Path Selection Screen (One-time) -->
+        <div id="path-selection-screen" class="screen">
+            <div class="hub-content" style="text-align: center;">
+                <h1>Choose Your Path</h1>
+                <p>Select your class. This choice is permanent and cannot be changed.</p>
+                <div class="path-grid">
+                    <div class="card path-card" data-class="Assassin">
+                        <h3>🗡️ Assassin</h3>
+                        <p>High speed, precise strikes. Small mistakes are costly.</p>
+                    </div>
+                    <div class="card path-card" data-class="Juggernaut">
+                        <h3>🛡️ Juggernaut</h3>
+                        <p>Balanced resilience. Steady progress wins the war.</p>
+                    </div>
+                    <div class="card path-card" data-class="Word-Mage">
+                        <h3>✨ Word-Mage</h3>
+                        <p>Complex spells. High reward for linguistic mastery.</p>
+                    </div>
+                </div>
+                <p id="path-error" class="error-text hidden" style="margin-top: 1rem;"></p>
+            </div>
+        </div>
+
+        <!-- Hub Screen -->
+        <div id="hub-screen" class="screen">
+            <div class="hub-content">
+                <header>
+                    <h2 id="hub-username">Player</h2>
+                    <div class="stats-bar">
+                        <div class="stat-item">
+                            <span class="stat-label">Level</span>
+                            <span class="stat-value" id="hub-level">1</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">ELO</span>
+                            <span class="stat-value" id="hub-elo">1000</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Coins</span>
+                            <span class="stat-value" id="hub-coins">0</span>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="action-grid">
+                    <div class="card" id="find-match-btn">
+                        <h3>Find Match</h3>
+                        <p>Queue for competitive PvP.</p>
+                    </div>
+                    <div class="card" id="campaign-btn">
+                        <h3>Campaign</h3>
+                        <p>Fight the Shadow Bosses.</p>
+                    </div>
+                    <div class="card" id="training-btn">
+                        <h3>Training</h3>
+                        <p>Practise your accuracy.</p>
+                    </div>
+                    <div class="card" id="shop-btn">
+                        <h3>Market</h3>
+                        <p>Buy lootboxes and items.</p>
+                    </div>
+                    <div class="card" id="auctions-btn">
+                        <h3>Auctions</h3>
+                        <p>Player-driven trade.</p>
+                    </div>
+                </div>
+                <button id="logout-btn" class="secondary-btn" style="margin-top: 2rem; width: auto;">Logout</button>
+                
+                <div id="matchmaking-overlay" class="hidden" style="margin-top: 1rem;">
+                    <p id="queue-status">Searching for opponent...</p>
+                    <button id="cancel-match-btn" class="text-btn">Cancel Matchmaking</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Arena Screen -->
+        <div id="arena-screen" class="screen">
+            <div class="arena-header">
+                <div>
+                    <h3 id="arena-opponent-name">Opponent</h3>
+                    <div class="hp-bar"><div id="opponent-hp-fill" class="hp-fill boss" style="width: 100%;"></div></div>
+                </div>
+                <div id="timer-display" style="font-weight: 700;">60s</div>
+                <div style="text-align: right;">
+                    <h3>You</h3>
+                    <div class="hp-bar"><div id="player-hp-fill" class="hp-fill" style="width: 100%;"></div></div>
+                </div>
+            </div>
+            
+            <div class="game-container">
+                <div id="word-display">Type the <span class="current">words</span> here...</div>
+                <div id="super-attack-ui" class="hidden">
+                    <p>SUPER ATTACK READY!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shop Screen -->
+        <div id="shop-screen" class="screen">
+            <div class="hub-content">
+                <header>
+                    <h2>The Market</h2>
+                    <button class="back-to-hub text-btn">← Back</button>
+                </header>
+                <div class="shop-grid">
+                    <div class="item-card box-card" data-box="common">
+                        <h3>Common Box</h3>
+                        <p>100 Coins</p>
+                        <button class="buy-box-btn" data-box="Common">Buy</button>
+                    </div>
+                    <div class="item-card box-card" data-box="rare">
+                        <h3>Rare Box</h3>
+                        <p>500 Coins</p>
+                        <button class="buy-box-btn" data-box="Rare">Buy</button>
+                    </div>
+                    <div class="item-card box-card" data-box="legendary">
+                        <h3>Legendary Box</h3>
+                        <p>2000 Coins</p>
+                        <button class="buy-box-btn" data-box="Legendary">Buy</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Unboxing Overlay -->
+            <div id="unboxing-overlay" class="hidden">
+                <div class="unboxing-content">
+                    <div id="box-animation-container" class="shaking">📦</div>
+                    <div id="item-reveal" class="hidden">
+                        <h2 id="revealed-item-name">Item Name</h2>
+                        <div id="revealed-item-rarity" class="rarity-badge">Common</div>
+                        <button id="unboxing-close-btn" style="margin-top: 1.5rem;">Continue</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auction Screen -->
+        <div id="auction-screen" class="screen">
+            <div class="hub-content">
+                <header>
+                    <h2>Auctions</h2>
+                    <button class="back-to-hub text-btn">← Back</button>
+                </header>
+                <div id="auction-list" class="auction-grid">
+                    <!-- Auctions populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Training Screen -->
+        <div id="training-screen" class="screen">
+            <div class="hub-content" style="text-align: center;">
+                <div class="training-dummy">🎯</div>
+                <h2>Training Dummy</h2>
+                <div class="hp-bar" style="margin-bottom: 2rem;"><div id="dummy-hp-fill" class="hp-fill" style="width: 100%;"></div></div>
+                <div id="training-word-display" style="font-size: 2rem; margin-bottom: 2rem;">Ready?</div>
+                <button id="quit-training-btn" class="secondary-btn">Quit Training</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/socket.js"></script>
+    <script src="js/input.js"></script>
+    <script src="js/shop.js"></script>
+    <script src="js/auction.js"></script>
+    <script src="js/trainingDictionary.js"></script>
+    <script src="js/training.js"></script>
+    <script src="js/ui.js"></script>
+</body>
+</html>

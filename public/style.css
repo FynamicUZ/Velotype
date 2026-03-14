@@ -1,0 +1,306 @@
+/* Simplistic Minimal Design System */
+:root {
+    --bg-dark: #0f1115;
+    --surface: #1a1d23;
+    --surface-light: #242830;
+    --text-main: #eef1f5;
+    --text-muted: #94a3b8;
+    --primary: #ffffff;
+    --accent: #3b82f6; 
+    --danger: #ef4444;
+    --success: #22c55e;
+    --border: rgba(255, 255, 255, 0.08);
+    
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,0.1);
+    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+}
+
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    overflow: hidden;
+    line-height: 1.5;
+}
+
+#app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+.screen {
+    position: absolute;
+    inset: 0;
+    display: none;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    background: var(--bg-dark);
+}
+
+.screen.active {
+    display: flex;
+}
+
+.hidden { display: none !important; }
+
+/* Typography */
+h1 { font-size: 2.5rem; font-weight: 800; letter-spacing: -0.025em; margin-bottom: 2rem; }
+h2 { font-size: 1.5rem; font-weight: 600; margin-bottom: 1rem; color: var(--text-main); }
+p { color: var(--text-muted); margin-bottom: 1.5rem; }
+
+/* Form Elements */
+.auth-box {
+    width: 100%;
+    max-width: 440px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: var(--surface);
+    padding: 2.5rem;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-md);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    width: 100%;
+}
+
+label { font-size: 0.875rem; font-weight: 500; color: var(--text-muted); }
+
+input[type="text"], input[type="email"], input[type="password"] {
+    background: var(--surface-light);
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+input:focus {
+    border-color: var(--accent);
+}
+
+button {
+    width: 100%;
+    background: var(--primary);
+    color: #000;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+}
+
+button:hover { opacity: 0.9; }
+button:active { transform: scale(0.98); }
+
+button.secondary-btn {
+    background: transparent;
+    color: var(--text-main);
+    border: 1px solid var(--border);
+}
+
+button.secondary-btn:hover { background: var(--surface-light); }
+
+button.text-btn {
+    background: transparent;
+    color: var(--accent);
+    padding: 0;
+    width: auto;
+}
+
+/* Specific Utilities */
+.separator {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 1.5rem 0;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.separator::before, .separator::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--border);
+}
+
+.separator::before { margin-right: .5em; }
+.separator::after { margin-left: .5em; }
+
+.google-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    background: #fff;
+    color: #000;
+}
+
+/* Hub & Navigation */
+.hub-content {
+    width: 100%;
+    max-width: 800px;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3rem;
+    width: 100%;
+}
+
+.stats-bar {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+}
+
+.stat-label { font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted); }
+.stat-value { font-weight: 700; font-size: 1.125rem; }
+
+/* Grid Layouts */
+.path-grid, .action-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    width: 100%;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 1.5rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.card:hover {
+    border-color: var(--accent);
+    background: var(--surface-light);
+}
+
+.card h3 { margin-bottom: 0.5rem; }
+.card p { font-size: 0.875rem; margin: 0; }
+
+/* Arena UI - Simplistic Minimalist UI
+- Refined Aesthetic: Removed high-glow/neon effects in favor of a clean, premium "Deep Slate" design.
+- Typing Feedback: Restored the classic green/red feedback style:
+  - Green: Correct letters for clear positive reinforcement.
+  - Red Background: Immediate visual notification of typos to improve accuracy.
+- Consistent Design Tokens: Implemented a new design system in `style.css` using modern typography (`Inter`) and a curated color palette.
+
+Training Mode Enhancements
+- Infinity HP Dummy: Fixed the dummy's healthbar to correctly display `∞ / ∞`.
+- Exit Logic: Added a "Quit Training" button to easily return to the Hub at any time.
+- Optimized Word Flow: Training now utilizes the full simplistic display for better practice sessions.
+*/
+#arena-screen { flex-direction: column; padding: 0; }
+.arena-header { padding: 1rem 2rem; border-bottom: 1px solid var(--border); width: 100%; display: flex; justify-content: space-between; align-items: center; }
+
+.game-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    max-width: 900px;
+    padding: 2rem;
+}
+
+#word-display {
+    font-size: 2rem;
+    font-weight: 600;
+    margin-bottom: 3rem;
+    text-align: center;
+    position: relative;
+    color: var(--text-muted);
+}
+
+#word-display .correct { color: var(--success); }
+#word-display .current { border-bottom: 2px solid var(--accent); color: var(--text-main); }
+#word-display .error { color: var(--danger); background: rgba(239, 68, 68, 0.1); border-radius: 2px; }
+
+.player-status { width: 100%; display: flex; flex-direction: column; gap: 0.5rem; margin-top: 2rem; }
+.hp-bar { width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; position: relative; }
+.hp-fill { height: 100%; background: var(--success); transition: width 0.3s ease; }
+.hp-fill.boss { background: var(--danger); }
+.hp-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 0.625rem; font-weight: 700; color: #fff; pointer-events: none; }
+
+/* Training Mode Specifics */
+.training-dummy { font-size: 4rem; margin-bottom: 2rem; filter: grayscale(1); opacity: 0.5; }
+
+/* Shop / Auction Minimalist */
+.shop-grid, .auction-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1.5rem;
+    width: 100%;
+    max-width: 1000px;
+}
+
+.item-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+}
+
+.rarity-badge {
+    align-self: flex-start;
+    font-size: 0.625rem;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 0.75rem;
+}
+
+.common { background: #475569; color: #fff; }
+.rare { background: #2563eb; color: #fff; }
+.legendary { background: #d97706; color: #fff; }
+
+/* Overlay Animations - Simplified */
+#unboxing-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center; z-index: 100;
+}
+.unboxing-content { text-align: center; }
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+.shaking { animation: shake 0.5s infinite; }
+
+.error-text { color: var(--danger); font-size: 0.875rem; margin-top: 0.5rem; }
