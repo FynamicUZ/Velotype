@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { Button } from '@/components/ui/Button';
 import { useAuth } from '@/context/AuthContext';
 
 export default function WelcomePage() {
