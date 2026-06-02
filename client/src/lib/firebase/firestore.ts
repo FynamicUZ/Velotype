@@ -122,6 +122,67 @@ export async function removeFriend(myUid: string, friendUid: string): Promise<vo
   await updateDoc(doc(db, 'friendRequests', id), { status: 'rejected' });
 }
 
+// ─── Game invites ─────────────────────────────────────────────────────────────
+
+export interface GameInvite {
+  id: string;
+  fromUid: string;
+  fromUsername: string;
+  fromPhotoURL: string | null;
+  toUid: string;
+  toUsername: string;
+  roomCode: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: number;
+}
+
+function gameInviteId(a: string, b: string) {
+  return a < b ? `gi_${a}_${b}` : `gi_${b}_${a}`;
+}
+
+export async function sendGameInvite(
+  from: { uid: string; username: string; photoURL: string | null },
+  to: { uid: string; username: string },
+  roomCode: string,
+): Promise<void> {
+  const id = gameInviteId(from.uid, to.uid);
+  const invite: GameInvite = {
+    id,
+    fromUid: from.uid,
+    fromUsername: from.username,
+    fromPhotoURL: from.photoURL,
+    toUid: to.uid,
+    toUsername: to.username,
+    roomCode,
+    status: 'pending',
+    createdAt: Date.now(),
+  };
+  await setDoc(doc(db, 'gameInvites', id), invite);
+}
+
+export async function respondToGameInvite(
+  id: string,
+  status: 'accepted' | 'declined',
+): Promise<void> {
+  await updateDoc(doc(db, 'gameInvites', id), { status });
+}
+
+export function subscribeIncomingInvites(
+  myUid: string,
+  onInvites: (invites: GameInvite[]) => void,
+): Unsubscribe {
+  const q = query(
+    collection(db, 'gameInvites'),
+    where('toUid', '==', myUid),
+    where('status', '==', 'pending'),
+  );
+  return onSnapshot(q, (snap) => {
+    onInvites(snap.docs.map((d) => d.data() as GameInvite));
+  });
+}
+
+// ─── Friend requests ──────────────────────────────────────────────────────────
+
 export function subscribeFriendRequests(
   myUid: string,
   onChange: (incoming: FriendRequest[], friends: FriendRequest[]) => void,

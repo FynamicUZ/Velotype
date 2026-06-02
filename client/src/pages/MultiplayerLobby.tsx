@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -9,10 +9,20 @@ import { randomSeed } from '@/lib/utils/seededRandom';
 import { spriteForHat, emojiForWand } from '@/lib/game/cosmeticAssets';
 import type { PeerInfo } from '@/lib/webrtc/types';
 
-const TOTAL_WORDS_MP = 50;
+const TOTAL_WORDS_MP = 200;
+
+interface LobbyNavState {
+  autoCreate?: boolean;
+  autoJoin?: boolean;
+  roomCode?: string;
+  challengedFriend?: string;
+  hostUsername?: string;
+}
 
 export default function MultiplayerLobby() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const navState = (location.state ?? null) as LobbyNavState | null;
   const profile = usePlayerStore((s) => s.profile);
 
   const status = useMpStore((s) => s.status);
@@ -31,6 +41,34 @@ export default function MultiplayerLobby() {
   const goInGame = useMpStore((s) => s.goInGame);
 
   const [roomInput, setRoomInput] = useState('');
+  const didAutoConnect = useRef(false);
+
+  const myInfoRef = useRef<PeerInfo>({
+    name: profile.displayName,
+    level: profile.level,
+    elo: profile.elo,
+    cosmetics: profile.cosmetics,
+    equippedWeapon: profile.equippedWeapon,
+  });
+  myInfoRef.current = {
+    name: profile.displayName,
+    level: profile.level,
+    elo: profile.elo,
+    cosmetics: profile.cosmetics,
+    equippedWeapon: profile.equippedWeapon,
+  };
+
+  // Auto-connect when arriving from a friend challenge/invite
+  useEffect(() => {
+    if (didAutoConnect.current) return;
+    if (navState?.autoCreate && navState.roomCode && status === 'idle') {
+      didAutoConnect.current = true;
+      void startFriendCreate(myInfoRef.current, navState.roomCode);
+    } else if (navState?.autoJoin && navState.roomCode && status === 'idle') {
+      didAutoConnect.current = true;
+      void startFriendJoin(navState.roomCode, myInfoRef.current);
+    }
+  }, [navState, status, startFriendCreate, startFriendJoin]);
 
   const myInfo: PeerInfo = {
     name: profile.displayName,

@@ -112,7 +112,7 @@ export default function BattlePage() {
 
     const seed = navState.seed ?? randomSeed();
     const totalWords =
-      navState.totalWords ?? (mode === 'solo-practice' ? 30 : 50);
+      navState.totalWords ?? (mode === 'solo-practice' ? 120 : 50);
     const generated = generateWordSequence(seed, {
       totalWords,
       levelOffset: profile.level - 1,

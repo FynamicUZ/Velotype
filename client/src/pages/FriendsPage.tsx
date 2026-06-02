@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { customAlphabet } from 'nanoid';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -11,9 +12,12 @@ import {
   respondToRequest,
   removeFriend,
   subscribeFriendRequests,
+  sendGameInvite,
   type PublicUser,
   type FriendRequest,
 } from '@/lib/firebase/firestore';
+
+const makeRoomCode = customAlphabet('ABCDEFGHJKLMNPQRSTUVWXYZ23456789', 6);
 
 export default function FriendsPage() {
   const navigate = useNavigate();
@@ -27,6 +31,7 @@ export default function FriendsPage() {
   const [pendingRequests, setPendingRequests] = useState<FriendRequest[]>([]);
   const [friends, setFriends] = useState<FriendRequest[]>([]);
   const [sentUids, setSentUids] = useState<Set<string>>(new Set());
+  const [challenging, setChallenging] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -58,6 +63,24 @@ export default function FriendsPage() {
     };
     await sendFriendRequest(me, target);
     setSentUids((s) => new Set(s).add(target.uid));
+  }
+
+  async function handleChallenge(targetUid: string, targetUsername: string) {
+    if (!user || !profile.username || challenging) return;
+    setChallenging(targetUid);
+    try {
+      const code = makeRoomCode();
+      await sendGameInvite(
+        { uid: user.uid, username: profile.username, photoURL: profile.photoURL },
+        { uid: targetUid, username: targetUsername },
+        code,
+      );
+      navigate('/play', {
+        state: { autoCreate: true, roomCode: code, challengedFriend: targetUsername },
+      });
+    } finally {
+      setChallenging(null);
+    }
   }
 
   const friendUids = new Set(friends.map((f) => f.fromUid === user?.uid ? f.toUid : f.fromUid));
@@ -109,7 +132,9 @@ export default function FriendsPage() {
                   uid={friendUid}
                   username={friendName}
                   photoURL={friendPhoto}
+                  isChallenging={challenging === friendUid}
                   onRemove={() => user && removeFriend(user.uid, friendUid)}
+                  onChallenge={() => handleChallenge(friendUid, friendName)}
                 />
               );
             })
@@ -201,31 +226,45 @@ function FriendCard({
   username,
   photoURL,
   uid,
+  isChallenging,
   onRemove,
+  onChallenge,
 }: {
   uid: string;
   username: string;
   photoURL: string | null;
+  isChallenging: boolean;
   onRemove: () => void;
+  onChallenge: () => void;
 }) {
-  const [confirm, setConfirm] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   return (
     <Card className="p-4 flex items-center justify-between">
       <div className="flex items-center gap-3">
         <Avatar photoURL={photoURL} username={username} />
         <p className="font-medium">{username}</p>
       </div>
-      {confirm ? (
-        <div className="flex gap-2 items-center">
-          <span className="text-xs text-white/50">Remove?</span>
-          <Button size="sm" variant="ghost" onClick={() => { onRemove(); setConfirm(false); }}>Yes</Button>
-          <Button size="sm" variant="ghost" onClick={() => setConfirm(false)}>No</Button>
-        </div>
-      ) : (
-        <button onClick={() => setConfirm(true)} className="text-white/30 hover:text-arcane-rose text-xs transition-colors">
-          Remove
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onChallenge}
+          disabled={isChallenging}
+          title="Challenge to duel"
+          className="text-arcane-violet hover:text-arcane-cyan text-base transition-colors disabled:opacity-40"
+        >
+          {isChallenging ? '…' : '⚔️'}
         </button>
-      )}
+        {confirmRemove ? (
+          <div className="flex gap-1 items-center">
+            <span className="text-xs text-white/50">Remove?</span>
+            <Button size="sm" variant="ghost" onClick={() => { onRemove(); setConfirmRemove(false); }}>Yes</Button>
+            <Button size="sm" variant="ghost" onClick={() => setConfirmRemove(false)}>No</Button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmRemove(true)} className="text-white/30 hover:text-arcane-rose text-xs transition-colors">
+            Remove
+          </button>
+        )}
+      </div>
     </Card>
   );
 }

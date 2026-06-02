@@ -38,7 +38,7 @@ interface MpStoreState {
   setStatus: (s: MpStatus) => void;
   setError: (m: string) => void;
 
-  startFriendCreate: (myInfo: PeerInfo) => Promise<void>;
+  startFriendCreate: (myInfo: PeerInfo, presetCode?: string) => Promise<void>;
   startFriendJoin: (code: string, myInfo: PeerInfo) => Promise<void>;
   startMatchmaking: (myInfo: PeerInfo) => Promise<void>;
   cancelMatchmaking: () => void;
@@ -163,12 +163,12 @@ export const useMpStore = create<MpStoreState>((set, get) => {
     setStatus: (s) => set({ status: s }),
     setError: (m) => set({ status: 'error', errorMsg: m }),
 
-    startFriendCreate: async (myInfo) => {
+    startFriendCreate: async (myInfo, presetCode?) => {
       myInfoCache = myInfo;
       helloSent = false;
       set({ mode: 'friend', errorMsg: null, peerInfo: null, isHost: true });
       const sig = await ensureSignalingOpen();
-      const code = makeCode();
+      const code = presetCode ?? makeCode();
       sig.send({ type: 'create-room', roomCode: code });
     },
 

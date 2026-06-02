@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResultsCard } from '@/components/ResultsCard';
+import { Button } from '@/components/ui/Button';
 import { useGameStore } from '@/store/useGameStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useMpStore } from '@/store/useMpStore';
@@ -22,6 +23,7 @@ export default function ResultsPage() {
   const markFighterDefeated = usePlayerStore((s) => s.markFighterDefeated);
   const unlockWorld = usePlayerStore((s) => s.unlockWorld);
   const mpCleanup = useMpStore((s) => s.cleanup);
+  const setMpStatus = useMpStore((s) => s.setStatus);
 
   const isMp = mode === 'mp-ranked' || mode === 'mp-friend';
   const [granted, setGranted] = useState(false);
@@ -91,7 +93,7 @@ export default function ResultsPage() {
   if (phase !== 'RESULTS') return null;
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 gap-4">
       <ResultsCard
         won={won}
         stats={stats}
@@ -102,6 +104,18 @@ export default function ResultsPage() {
           navigate('/');
         }}
       />
+      {mode === 'mp-friend' && (
+        <Button
+          variant="secondary"
+          onClick={() => {
+            resetBattle();
+            setMpStatus('lobby');
+            navigate('/play', { replace: true });
+          }}
+        >
+          ⚔️ Play Again
+        </Button>
+      )}
     </div>
   );
 }
