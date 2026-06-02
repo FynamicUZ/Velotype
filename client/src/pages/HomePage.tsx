@@ -61,7 +61,7 @@ export default function HomePage() {
         </div>
       </Card>
 
-      <main className="grid md:grid-cols-3 gap-6 w-full max-w-5xl">
+      <main className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-5xl">
         <Card className="p-6 flex flex-col gap-4 hover:border-arcane-violet/50 transition-colors">
           <div className="text-5xl">⚔️</div>
           <h2 className="font-display text-xl">Multiplayer</h2>
@@ -95,6 +95,21 @@ export default function HomePage() {
             }
           >
             Train
+          </Button>
+        </Card>
+
+        <Card className="p-6 flex flex-col gap-4 hover:border-arcane-rose/50 transition-colors">
+          <div className="text-5xl">👑</div>
+          <h2 className="font-display text-xl">Battle Royale</h2>
+          <p className="text-white/60 text-sm flex-1">
+            Up to 4 mages fight at once. Last one standing wins.
+          </p>
+          <Button
+            variant="secondary"
+            className="border-arcane-rose/40 hover:border-arcane-rose/70 text-arcane-rose"
+            onClick={() => navigate('/br')}
+          >
+            Enter
           </Button>
         </Card>
       </main>

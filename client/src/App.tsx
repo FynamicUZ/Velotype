@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/Button';
 import WelcomePage from '@/pages/WelcomePage';
 import NicknameSetupPage from '@/pages/NicknameSetupPage';
 import FriendsPage from '@/pages/FriendsPage';
+import BattleRoyaleLobby from '@/pages/BattleRoyaleLobby';
+import BattleRoyalePage from '@/pages/BattleRoyalePage';
 import HomePage from '@/pages/HomePage';
 import MultiplayerLobby from '@/pages/MultiplayerLobby';
 import BattlePage from '@/pages/BattlePage';
@@ -101,6 +103,8 @@ function AppRoutes() {
         <Route path="/shop" element={<ShopPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/friends" element={<FriendsPage />} />
+        <Route path="/br" element={<BattleRoyaleLobby />} />
+        <Route path="/br/battle" element={<BattleRoyalePage />} />
         <Route path="/sp" element={<WorldMapPage />} />
         <Route path="/sp/world/:worldId" element={<FightSelectPage />} />
         <Route path="/sp/survival" element={<SurvivalPage />} />

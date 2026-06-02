@@ -2,6 +2,7 @@ import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { nanoid } from 'nanoid';
 import { RoomManager } from './roomManager.js';
+import { BRRoomManager } from './brRoomManager.js';
 import { Matchmaker } from './matchmaker.js';
 import type { ClientToServer, ServerToClient } from './types.js';
 
@@ -41,8 +42,9 @@ export function createSignalingServer(port: number): SignalingServer {
   });
 
   const rooms = new RoomManager();
+  const brRooms = new BRRoomManager();
   const matchmaker = new Matchmaker();
-  const cleanupInterval = setInterval(() => rooms.cleanup(), 60_000);
+  const cleanupInterval = setInterval(() => { rooms.cleanup(); brRooms.cleanup(); }, 60_000);
   const rateState = new WeakMap<WebSocket, { count: number; windowStart: number }>();
 
   function send(socket: WebSocket, msg: ServerToClient): void {
@@ -136,6 +138,64 @@ export function createSignalingServer(port: number): SignalingServer {
           if (room) rooms.remove(room.code);
           break;
         }
+        case 'br-create': {
+          const { room, playerId } = brRooms.create(socket, msg.name, msg.maxPlayers);
+          send(socket, { type: 'br-created', roomCode: room.code, myId: playerId });
+          break;
+        }
+        case 'br-join': {
+          const result = brRooms.join(msg.roomCode.toUpperCase(), socket, msg.name);
+          if (!result) {
+            send(socket, { type: 'br-error', message: 'Room not found, full, or already started' });
+            return;
+          }
+          const { room, playerId } = result;
+          const players = Array.from(room.players.values()).map((p) => ({ id: p.id, name: p.name }));
+          send(socket, { type: 'br-joined', roomCode: room.code, myId: playerId, players });
+          brRooms.broadcast(room, { type: 'br-player-joined', player: { id: playerId, name: msg.name } }, playerId);
+          break;
+        }
+        case 'br-start': {
+          const brRef = brRooms.getBySocket(socket);
+          if (!brRef) return;
+          const { room: brRoom, player: brPlayer } = brRef;
+          if (brRoom.hostId !== brPlayer.id) return;
+          if (brRoom.players.size < 2) {
+            send(socket, { type: 'br-error', message: 'Need at least 2 players to start' });
+            return;
+          }
+          brRoom.state = 'in-game';
+          const seed = Math.floor(Math.random() * 2 ** 31);
+          brRooms.broadcast(brRoom, { type: 'br-started', seed, totalWords: 100 });
+          break;
+        }
+        case 'br-relay': {
+          const brRef = brRooms.getBySocket(socket);
+          if (!brRef) return;
+          brRooms.broadcast(brRef.room, { type: 'br-relay', fromId: brRef.player.id, payload: msg.payload });
+          break;
+        }
+        case 'br-eliminated': {
+          const brRef = brRooms.getBySocket(socket);
+          if (!brRef) return;
+          const { room: brRoom, player: brPlayer } = brRef;
+          const { aliveCount, winner } = brRooms.eliminatePlayer(brPlayer.id, brRoom);
+          brRooms.broadcast(brRoom, { type: 'br-eliminated', playerId: brPlayer.id });
+          if (winner) {
+            brRoom.state = 'finished';
+            brRooms.broadcast(brRoom, { type: 'br-finished', winnerId: winner.id, winnerName: winner.name });
+          } else if (aliveCount === 0) {
+            brRoom.state = 'finished';
+          }
+          break;
+        }
+        case 'br-leave': {
+          const brLeaveResult = brRooms.removePlayer(socket);
+          if (brLeaveResult && brLeaveResult.room.players.size > 0) {
+            brRooms.broadcast(brLeaveResult.room, { type: 'br-player-left', playerId: brLeaveResult.player.id });
+          }
+          break;
+        }
       }
     });
 
@@ -145,6 +205,15 @@ export function createSignalingServer(port: number): SignalingServer {
       if (room) {
         relay(socket, { type: 'peer-disconnected' });
         rooms.remove(room.code);
+      }
+      const brResult = brRooms.removePlayer(socket);
+      if (brResult && brResult.room.players.size > 0) {
+        const { room: brRoom, player, aliveCount, winner } = brResult;
+        brRooms.broadcast(brRoom, { type: 'br-player-left', playerId: player.id });
+        if (brRoom.state === 'in-game' && winner) {
+          brRoom.state = 'finished';
+          brRooms.broadcast(brRoom, { type: 'br-finished', winnerId: winner.id, winnerName: winner.name });
+        }
       }
     });
 
