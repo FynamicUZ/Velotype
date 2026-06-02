@@ -2,7 +2,7 @@ import http from 'node:http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { nanoid } from 'nanoid';
 import { RoomManager } from './roomManager.js';
-import { BRRoomManager } from './brRoomManager.js';
+import { BRRoomManager, type BRRoom } from './brRoomManager.js';
 import { Matchmaker } from './matchmaker.js';
 import type { ClientToServer, ServerToClient } from './types.js';
 
@@ -12,6 +12,14 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? '')
   .filter(Boolean);
 
 const RATE_LIMIT_MSGS_PER_SEC = 50;
+
+// Word pool organized by tier (difficulty increases each 3 rounds)
+const WORD_TIERS = [
+  ['cat', 'dog', 'fire', 'mage', 'wand', 'cast', 'bolt', 'rune', 'dart', 'wave', 'hex', 'orb'],
+  ['dragon', 'battle', 'arcane', 'shield', 'portal', 'specter', 'frozen', 'hunter', 'typing', 'wizard'],
+  ['sorcerer', 'firestorm', 'darkness', 'mystical', 'crystals', 'wanderer', 'midnight', 'silently'],
+  ['necromancer', 'spellcaster', 'thunderbolt', 'catastrophe', 'annihilate', 'obliterate', 'devastating'],
+];
 
 export interface SignalingServer {
   wss: WebSocketServer;
@@ -81,6 +89,75 @@ export function createSignalingServer(port: number): SignalingServer {
     return state.count > RATE_LIMIT_MSGS_PER_SEC;
   }
 
+  // ── Battle Royale round logic ──────────────────────────────────────────────
+
+  function pickWord(room: BRRoom): string {
+    const roundNum = (room.currentRound?.roundNum ?? 0) + 1;
+    const tierIdx = Math.min(Math.floor((roundNum - 1) / 3), WORD_TIERS.length - 1);
+    const tier = WORD_TIERS[tierIdx]!;
+    const available = tier.filter((w) => !room.usedWords.has(w));
+    const pool = available.length > 0 ? available : tier;
+    const word = pool[Math.floor(Math.random() * pool.length)]!;
+    room.usedWords.add(word);
+    return word;
+  }
+
+  function startBRRound(room: BRRoom): void {
+    if (room.state === 'finished') return;
+    const word = pickWord(room);
+    const timeoutMs = Math.max(6000, word.length * 1100);
+    const roundNum = (room.currentRound?.roundNum ?? 0) + 1;
+
+    const timer = setTimeout(() => endBRRound(room), timeoutMs);
+    room.currentRound = { word, timeoutMs, roundNum, completions: new Map(), startedAt: Date.now(), timer };
+    room.state = 'round-active';
+
+    brRooms.broadcast(room, { type: 'br-round-start', roundNum, word, timeoutMs });
+  }
+
+  function endBRRound(room: BRRoom): void {
+    if (room.state !== 'round-active' || !room.currentRound) return;
+
+    if (room.currentRound.timer) {
+      clearTimeout(room.currentRound.timer);
+      room.currentRound.timer = null;
+    }
+    room.state = 'round-end';
+
+    const alive = brRooms.alivePlayers(room);
+    const completions = room.currentRound.completions;
+
+    // Players who didn't complete the word in time are eliminated
+    const failed = alive.filter((p) => !completions.has(p.id));
+    const eliminated: { id: string; name: string }[] = [];
+
+    for (const p of failed) {
+      brRooms.eliminatePlayer(p.id, room);
+      eliminated.push({ id: p.id, name: p.name });
+    }
+
+    const survivors = brRooms.alivePlayers(room);
+    brRooms.broadcast(room, { type: 'br-round-end', eliminated, survivorCount: survivors.length });
+
+    if (survivors.length === 1) {
+      setTimeout(() => {
+        room.state = 'finished';
+        const w = survivors[0]!;
+        brRooms.broadcast(room, { type: 'br-finished', winnerId: w.id, winnerName: w.name });
+      }, 2500);
+    } else if (survivors.length === 0) {
+      // All failed the same round — nobody wins (edge case)
+      room.state = 'finished';
+    } else {
+      // Continue — next round after short pause
+      setTimeout(() => {
+        if (room.state === 'round-end') startBRRound(room);
+      }, 2500);
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+
   wss.on('connection', (socket) => {
     socket.on('message', (raw) => {
       if (isRateLimited(socket)) {
@@ -97,6 +174,7 @@ export function createSignalingServer(port: number): SignalingServer {
       }
 
       switch (msg.type) {
+        // ── 1v1 / ranked ───────────────────────────────────────────────────
         case 'create-room': {
           const room = rooms.create(msg.roomCode.toUpperCase(), socket);
           if (!room) {
@@ -138,6 +216,8 @@ export function createSignalingServer(port: number): SignalingServer {
           if (room) rooms.remove(room.code);
           break;
         }
+
+        // ── Battle Royale ──────────────────────────────────────────────────
         case 'br-create': {
           const { room, playerId } = brRooms.create(socket, msg.name, msg.maxPlayers);
           send(socket, { type: 'br-created', roomCode: room.code, myId: playerId });
@@ -164,29 +244,26 @@ export function createSignalingServer(port: number): SignalingServer {
             send(socket, { type: 'br-error', message: 'Need at least 2 players to start' });
             return;
           }
-          brRoom.state = 'in-game';
-          const seed = Math.floor(Math.random() * 2 ** 31);
-          brRooms.broadcast(brRoom, { type: 'br-started', seed, totalWords: 100 });
+          startBRRound(brRoom);
           break;
         }
-        case 'br-relay': {
-          const brRef = brRooms.getBySocket(socket);
-          if (!brRef) return;
-          brRooms.broadcast(brRef.room, { type: 'br-relay', fromId: brRef.player.id, payload: msg.payload });
-          break;
-        }
-        case 'br-eliminated': {
+        case 'br-word-done': {
           const brRef = brRooms.getBySocket(socket);
           if (!brRef) return;
           const { room: brRoom, player: brPlayer } = brRef;
-          const { aliveCount, winner } = brRooms.eliminatePlayer(brPlayer.id, brRoom);
-          brRooms.broadcast(brRoom, { type: 'br-eliminated', playerId: brPlayer.id });
-          if (winner) {
-            brRoom.state = 'finished';
-            brRooms.broadcast(brRoom, { type: 'br-finished', winnerId: winner.id, winnerName: winner.name });
-          } else if (aliveCount === 0) {
-            brRoom.state = 'finished';
-          }
+          if (brRoom.state !== 'round-active' || !brRoom.currentRound) return;
+          if (!brPlayer.alive) return;
+
+          const elapsed = Date.now() - brRoom.currentRound.startedAt;
+          brRoom.currentRound.completions.set(brPlayer.id, elapsed);
+
+          // Notify everyone that this player finished
+          brRooms.broadcast(brRoom, { type: 'br-player-done', playerId: brPlayer.id });
+
+          // If all alive players have completed, end the round early
+          const alive = brRooms.alivePlayers(brRoom);
+          const allDone = alive.every((p) => brRoom.currentRound!.completions.has(p.id));
+          if (allDone) endBRRound(brRoom);
           break;
         }
         case 'br-leave': {
@@ -208,11 +285,17 @@ export function createSignalingServer(port: number): SignalingServer {
       }
       const brResult = brRooms.removePlayer(socket);
       if (brResult && brResult.room.players.size > 0) {
-        const { room: brRoom, player, aliveCount, winner } = brResult;
+        const { room: brRoom, player } = brResult;
         brRooms.broadcast(brRoom, { type: 'br-player-left', playerId: player.id });
-        if (brRoom.state === 'in-game' && winner) {
-          brRoom.state = 'finished';
-          brRooms.broadcast(brRoom, { type: 'br-finished', winnerId: winner.id, winnerName: winner.name });
+        // If game is active and only 1 alive remains after disconnect, declare winner
+        if (brRoom.state === 'round-active' || brRoom.state === 'round-end') {
+          const survivors = brRooms.alivePlayers(brRoom);
+          if (survivors.length === 1) {
+            if (brRoom.currentRound?.timer) clearTimeout(brRoom.currentRound.timer);
+            brRoom.state = 'finished';
+            const w = survivors[0]!;
+            brRooms.broadcast(brRoom, { type: 'br-finished', winnerId: w.id, winnerName: w.name });
+          }
         }
       }
     });

@@ -11,8 +11,7 @@ export type ClientToServer =
   | { type: 'br-create'; name: string; maxPlayers: number }
   | { type: 'br-join'; roomCode: string; name: string }
   | { type: 'br-start' }
-  | { type: 'br-relay'; payload: unknown }
-  | { type: 'br-eliminated' }
+  | { type: 'br-word-done' }
   | { type: 'br-leave' };
 
 export type ServerToClient =
@@ -29,8 +28,8 @@ export type ServerToClient =
   | { type: 'br-joined'; roomCode: string; myId: string; players: { id: string; name: string }[] }
   | { type: 'br-player-joined'; player: { id: string; name: string } }
   | { type: 'br-player-left'; playerId: string }
-  | { type: 'br-started'; seed: number; totalWords: number }
-  | { type: 'br-relay'; fromId: string; payload: unknown }
-  | { type: 'br-eliminated'; playerId: string }
+  | { type: 'br-round-start'; roundNum: number; word: string; timeoutMs: number }
+  | { type: 'br-player-done'; playerId: string }
+  | { type: 'br-round-end'; eliminated: { id: string; name: string }[]; survivorCount: number }
   | { type: 'br-finished'; winnerId: string; winnerName: string }
   | { type: 'br-error'; message: string };

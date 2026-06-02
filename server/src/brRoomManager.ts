@@ -8,12 +8,23 @@ export interface BRPlayer {
   alive: boolean;
 }
 
+export interface BRRoundState {
+  word: string;
+  timeoutMs: number;
+  roundNum: number;
+  completions: Map<string, number>; // playerId → completionTime (ms since round start)
+  startedAt: number;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
 export interface BRRoom {
   code: string;
   hostId: string;
   maxPlayers: number;
   players: Map<string, BRPlayer>;
-  state: 'waiting' | 'in-game' | 'finished';
+  state: 'waiting' | 'round-active' | 'round-end' | 'finished';
+  currentRound: BRRoundState | null;
+  usedWords: Set<string>;
   createdAt: number;
 }
 
@@ -21,11 +32,7 @@ export class BRRoomManager {
   private rooms = new Map<string, BRRoom>();
   private socketRef = new WeakMap<WebSocket, { roomCode: string; playerId: string }>();
 
-  create(
-    socket: WebSocket,
-    name: string,
-    maxPlayers: number,
-  ): { room: BRRoom; playerId: string } {
+  create(socket: WebSocket, name: string, maxPlayers: number): { room: BRRoom; playerId: string } {
     const code = nanoid(6).toUpperCase();
     const playerId = nanoid(8);
     const player: BRPlayer = { id: playerId, socket, name, alive: true };
@@ -35,6 +42,8 @@ export class BRRoomManager {
       maxPlayers: Math.min(Math.max(maxPlayers, 2), 8),
       players: new Map([[playerId, player]]),
       state: 'waiting',
+      currentRound: null,
+      usedWords: new Set(),
       createdAt: Date.now(),
     };
     this.rooms.set(code, room);
@@ -42,11 +51,7 @@ export class BRRoomManager {
     return { room, playerId };
   }
 
-  join(
-    code: string,
-    socket: WebSocket,
-    name: string,
-  ): { room: BRRoom; playerId: string } | null {
+  join(code: string, socket: WebSocket, name: string): { room: BRRoom; playerId: string } | null {
     const room = this.rooms.get(code);
     if (!room || room.state !== 'waiting') return null;
     if (room.players.size >= room.maxPlayers) return null;
@@ -79,58 +84,43 @@ export class BRRoomManager {
     }
   }
 
-  removePlayer(socket: WebSocket): {
-    room: BRRoom;
-    player: BRPlayer;
-    aliveCount: number;
-    winner: BRPlayer | null;
-  } | null {
-    const result = this.getBySocket(socket);
-    if (!result) return null;
-    const { room, player } = result;
+  removePlayer(socket: WebSocket): { room: BRRoom; player: BRPlayer } | null {
+    const ref = this.socketRef.get(socket);
+    if (!ref) return null;
+    const room = this.rooms.get(ref.roomCode);
+    if (!room) return null;
+    const player = room.players.get(ref.playerId);
+    if (!player) return null;
 
-    player.alive = false;
     room.players.delete(player.id);
 
     if (room.players.size === 0) {
+      if (room.currentRound?.timer) clearTimeout(room.currentRound.timer);
       this.rooms.delete(room.code);
-      return { room, player, aliveCount: 0, winner: null };
-    }
-
-    if (room.hostId === player.id) {
+    } else if (room.hostId === player.id) {
       const [newHostId] = room.players.keys();
       if (newHostId) room.hostId = newHostId;
     }
 
-    let aliveCount = 0;
-    let lastAlive: BRPlayer | null = null;
-    for (const p of room.players.values()) {
-      if (p.alive) { aliveCount++; lastAlive = p; }
-    }
-
-    return { room, player, aliveCount, winner: aliveCount === 1 ? lastAlive : null };
+    return { room, player };
   }
 
-  eliminatePlayer(
-    playerId: string,
-    room: BRRoom,
-  ): { aliveCount: number; winner: BRPlayer | null } {
-    const player = room.players.get(playerId);
-    if (player) player.alive = false;
+  alivePlayers(room: BRRoom): BRPlayer[] {
+    return Array.from(room.players.values()).filter((p) => p.alive);
+  }
 
-    let aliveCount = 0;
-    let lastAlive: BRPlayer | null = null;
-    for (const p of room.players.values()) {
-      if (p.alive) { aliveCount++; lastAlive = p; }
-    }
-
-    return { aliveCount, winner: aliveCount === 1 ? lastAlive : null };
+  eliminatePlayer(id: string, room: BRRoom): void {
+    const p = room.players.get(id);
+    if (p) p.alive = false;
   }
 
   cleanup(maxAgeMs = 10 * 60 * 1000): void {
     const now = Date.now();
     for (const [code, room] of this.rooms) {
-      if (now - room.createdAt > maxAgeMs) this.rooms.delete(code);
+      if (now - room.createdAt > maxAgeMs) {
+        if (room.currentRound?.timer) clearTimeout(room.currentRound.timer);
+        this.rooms.delete(code);
+      }
     }
   }
 }

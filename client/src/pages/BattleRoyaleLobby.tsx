@@ -11,16 +11,16 @@ const PLAYER_SPRITES = ['🧙', '🧝', '🧌', '🐉', '🔮', '👁', '⚡', '
 export default function BattleRoyaleLobby() {
   const navigate = useNavigate();
   const profile = usePlayerStore((s) => s.profile);
-  const { status, roomCode, myId, isHost, players, errorMsg, gameSeed, createRoom, joinRoom, startGame, cleanup } =
+  const { status, roomCode, myId, isHost, players, errorMsg, createRoom, joinRoom, startGame, cleanup } =
     useBrStore();
 
   const [codeInput, setCodeInput] = useState('');
 
   useEffect(() => {
-    if (status === 'in-game' && gameSeed !== null) {
+    if (status === 'round-active') {
       navigate('/br/battle', { replace: true });
     }
-  }, [status, gameSeed, navigate]);
+  }, [status, navigate]);
 
   const handleLeave = () => {
     cleanup();

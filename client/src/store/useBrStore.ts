@@ -8,11 +8,12 @@ export interface BrPlayer {
   name: string;
 }
 
-export type BrStatus = 'idle' | 'connecting' | 'waiting' | 'in-game' | 'results';
+export type BrStatus = 'idle' | 'connecting' | 'waiting' | 'round-active' | 'round-end' | 'results';
 
 export type BrInboundMsg =
-  | { type: 'br-relay'; fromId: string; payload: unknown }
-  | { type: 'br-eliminated'; playerId: string }
+  | { type: 'br-round-start'; roundNum: number; word: string; timeoutMs: number }
+  | { type: 'br-player-done'; playerId: string }
+  | { type: 'br-round-end'; eliminated: { id: string; name: string }[]; survivorCount: number }
   | { type: 'br-finished'; winnerId: string; winnerName: string }
   | { type: 'br-player-joined'; player: BrPlayer }
   | { type: 'br-player-left'; playerId: string };
@@ -23,16 +24,13 @@ interface BrStoreState {
   myId: string | null;
   isHost: boolean;
   players: BrPlayer[];
-  gameSeed: number | null;
-  gameTotalWords: number;
   winner: { id: string; name: string } | null;
   errorMsg: string | null;
 
   createRoom: (myName: string, maxPlayers?: number) => Promise<void>;
   joinRoom: (code: string, myName: string) => Promise<void>;
   startGame: () => void;
-  sendRelay: (payload: unknown) => void;
-  sendEliminated: () => void;
+  sendWordDone: () => void;
   onBrMessage: (cb: (msg: BrInboundMsg) => void) => () => void;
   cleanup: () => void;
 }
@@ -85,18 +83,25 @@ export const useBrStore = create<BrStoreState>((set, get) => {
         notify({ type: 'br-player-left', playerId });
         break;
       }
-      case 'br-started':
-        set({
-          status: 'in-game',
-          gameSeed: msg.seed as number,
-          gameTotalWords: msg.totalWords as number,
+      case 'br-round-start':
+        set({ status: 'round-active' });
+        notify({
+          type: 'br-round-start',
+          roundNum: msg.roundNum as number,
+          word: msg.word as string,
+          timeoutMs: msg.timeoutMs as number,
         });
         break;
-      case 'br-relay':
-        notify({ type: 'br-relay', fromId: msg.fromId as string, payload: msg.payload });
+      case 'br-player-done':
+        notify({ type: 'br-player-done', playerId: msg.playerId as string });
         break;
-      case 'br-eliminated':
-        notify({ type: 'br-eliminated', playerId: msg.playerId as string });
+      case 'br-round-end':
+        set({ status: 'round-end' });
+        notify({
+          type: 'br-round-end',
+          eliminated: msg.eliminated as { id: string; name: string }[],
+          survivorCount: msg.survivorCount as number,
+        });
         break;
       case 'br-finished': {
         const winner = { id: msg.winnerId as string, name: msg.winnerName as string };
@@ -114,14 +119,12 @@ export const useBrStore = create<BrStoreState>((set, get) => {
     return new Promise((resolve, reject) => {
       ws = new WebSocket(SIGNAL_URL);
       ws.onopen = () => resolve();
-      ws.onerror = () => reject(new Error('WebSocket connection failed'));
+      ws.onerror = () => reject(new Error('Connection failed'));
       ws.onmessage = (e) => {
         try { handleMsg(JSON.parse(e.data as string)); } catch {}
       };
       ws.onclose = () => {
-        if (get().status !== 'idle') {
-          set({ status: 'idle', errorMsg: 'Connection closed' });
-        }
+        if (get().status !== 'idle') set({ status: 'idle', errorMsg: 'Connection closed' });
       };
     });
   }
@@ -132,8 +135,6 @@ export const useBrStore = create<BrStoreState>((set, get) => {
     myId: null,
     isHost: false,
     players: [],
-    gameSeed: null,
-    gameTotalWords: 100,
     winner: null,
     errorMsg: null,
 
@@ -160,8 +161,7 @@ export const useBrStore = create<BrStoreState>((set, get) => {
     },
 
     startGame: () => wsSend({ type: 'br-start' }),
-    sendRelay: (payload) => wsSend({ type: 'br-relay', payload }),
-    sendEliminated: () => wsSend({ type: 'br-eliminated' }),
+    sendWordDone: () => wsSend({ type: 'br-word-done' }),
 
     onBrMessage: (cb) => {
       subscribers.add(cb);
@@ -179,8 +179,6 @@ export const useBrStore = create<BrStoreState>((set, get) => {
         myId: null,
         isHost: false,
         players: [],
-        gameSeed: null,
-        gameTotalWords: 100,
         winner: null,
         errorMsg: null,
       });
