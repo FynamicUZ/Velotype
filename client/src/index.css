@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-arcane-bg text-white font-body antialiased;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(168, 85, 247, 0.15), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(34, 211, 238, 0.12), transparent 40%);
+    background-attachment: fixed;
+  }
+  * {
+    @apply selection:bg-arcane-violet/40;
+  }
+}
