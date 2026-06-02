@@ -103,6 +103,9 @@ export default function HomePage() {
         <Button variant="ghost" onClick={() => navigate('/shop')}>
           🛒 Shop
         </Button>
+        <Button variant="ghost" onClick={() => navigate('/friends')}>
+          👥 Friends
+        </Button>
       </footer>
     </div>
   );

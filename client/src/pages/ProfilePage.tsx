@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
@@ -109,6 +109,10 @@ export default function ProfilePage() {
           </div>
         )}
       </Card>
+
+      <div className="text-center mb-2">
+        <Link to="/friends" className="text-arcane-cyan text-sm hover:underline">👥 Friends List</Link>
+      </div>
 
       <div className="mt-2 text-center">
         <Button

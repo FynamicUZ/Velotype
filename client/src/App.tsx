@@ -4,6 +4,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useCloudSync } from '@/hooks/useCloudSync';
 import WelcomePage from '@/pages/WelcomePage';
 import NicknameSetupPage from '@/pages/NicknameSetupPage';
+import FriendsPage from '@/pages/FriendsPage';
 import HomePage from '@/pages/HomePage';
 import MultiplayerLobby from '@/pages/MultiplayerLobby';
 import BattlePage from '@/pages/BattlePage';
@@ -39,6 +40,7 @@ function AppRoutes() {
       <Route path="/results" element={<ResultsPage />} />
       <Route path="/shop" element={<ShopPage />} />
       <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/friends" element={<FriendsPage />} />
       <Route path="/sp" element={<WorldMapPage />} />
       <Route path="/sp/world/:worldId" element={<FightSelectPage />} />
       <Route path="/sp/survival" element={<SurvivalPage />} />
