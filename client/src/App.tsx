@@ -1,4 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider } from '@/context/AuthContext';
+import { useCloudSync } from '@/hooks/useCloudSync';
 import HomePage from '@/pages/HomePage';
 import MultiplayerLobby from '@/pages/MultiplayerLobby';
 import BattlePage from '@/pages/BattlePage';
@@ -10,7 +12,8 @@ import FightSelectPage from '@/pages/singleplayer/FightSelectPage';
 import SurvivalPage from '@/pages/singleplayer/SurvivalPage';
 import TournamentPage from '@/pages/singleplayer/TournamentPage';
 
-export default function App() {
+function AppRoutes() {
+  useCloudSync();
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
@@ -25,5 +28,13 @@ export default function App() {
       <Route path="/sp/tournament/:worldId" element={<TournamentPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }

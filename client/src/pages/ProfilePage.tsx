@@ -3,11 +3,13 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { usePlayerStore, xpForNextLevel } from '@/store/usePlayerStore';
+import { useAuth } from '@/context/AuthContext';
 
 export default function ProfilePage() {
   const navigate = useNavigate();
   const profile = usePlayerStore((s) => s.profile);
   const reset = usePlayerStore((s) => s.reset);
+  const { user, login, logout, loading } = useAuth();
   const nextXp = xpForNextLevel(profile.level);
   const winRate =
     profile.stats.totalMatches > 0
@@ -26,9 +28,17 @@ export default function ProfilePage() {
 
       <Card className="p-6 mb-4">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-arcane-violet to-arcane-cyan flex items-center justify-center text-3xl">
-            🧙
-          </div>
+          {profile.photoURL ? (
+            <img
+              src={profile.photoURL}
+              alt="avatar"
+              className="w-16 h-16 rounded-full object-cover border-2 border-arcane-violet"
+            />
+          ) : (
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-arcane-violet to-arcane-cyan flex items-center justify-center text-3xl">
+              🧙
+            </div>
+          )}
           <div>
             <h2 className="font-display text-xl">{profile.displayName}</h2>
             <div className="flex gap-2 mt-1">
@@ -36,6 +46,9 @@ export default function ProfilePage() {
               <Badge color="cyan">Lvl {profile.level}</Badge>
               <Badge color="gold">{profile.coins} 🪙</Badge>
             </div>
+            {user && (
+              <p className="text-xs text-white/40 mt-1">{user.email}</p>
+            )}
           </div>
         </div>
         <div className="text-sm text-white/60 mb-1">
@@ -55,7 +68,7 @@ export default function ProfilePage() {
         <StatBox label="Win rate" value={`${winRate}%`} color="text-arcane-cyan" />
       </div>
 
-      <Card className="p-5">
+      <Card className="p-5 mb-4">
         <h3 className="font-display text-lg mb-3">Inventory</h3>
         <div className="grid grid-cols-2 gap-2 text-sm">
           {Object.entries(profile.inventory).map(([id, count]) => (
@@ -70,7 +83,34 @@ export default function ProfilePage() {
         </div>
       </Card>
 
-      <div className="mt-6 text-center">
+      {/* Auth section */}
+      <Card className="p-5 mb-4">
+        <h3 className="font-display text-lg mb-3">Account</h3>
+        {user ? (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white/80">Signed in with Google</p>
+              <p className="text-xs text-white/40">{user.email}</p>
+              <p className="text-xs text-arcane-lime mt-1">✓ Progress saved to cloud</p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              Sign out
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-white/80">Not signed in</p>
+              <p className="text-xs text-white/40">Sign in to save progress across devices</p>
+            </div>
+            <Button size="sm" onClick={login} disabled={loading}>
+              {loading ? 'Loading...' : 'Sign in with Google'}
+            </Button>
+          </div>
+        )}
+      </Card>
+
+      <div className="mt-2 text-center">
         <Button
           variant="ghost"
           size="sm"

@@ -12,6 +12,7 @@
   "dependencies": {
     "caniuse-lite": "^1.0.30001792",
     "clsx": "^2.1.1",
+    "firebase": "^12.14.0",
     "nanoid": "^5.1.11",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",

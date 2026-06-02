@@ -3,11 +3,13 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { usePlayerStore, xpForNextLevel } from '@/store/usePlayerStore';
+import { useAuth } from '@/context/AuthContext';
 
 export default function HomePage() {
   const navigate = useNavigate();
   const profile = usePlayerStore((s) => s.profile);
   const nextXp = xpForNextLevel(profile.level);
+  const { user, login } = useAuth();
 
   return (
     <div className="min-h-screen flex flex-col items-center px-6 py-10 gap-10">
@@ -23,6 +25,23 @@ export default function HomePage() {
           <Badge color="gold">{profile.coins} 🪙</Badge>
           <Badge color="cyan">Lvl {profile.level}</Badge>
           <Badge color="violet">ELO {profile.elo}</Badge>
+          {user ? (
+            <button
+              onClick={() => navigate('/profile')}
+              className="flex items-center gap-2 rounded-full overflow-hidden border border-white/20 hover:border-arcane-violet/60 transition-colors"
+              title={profile.displayName}
+            >
+              {profile.photoURL ? (
+                <img src={profile.photoURL} alt="avatar" className="w-8 h-8 object-cover" />
+              ) : (
+                <div className="w-8 h-8 bg-arcane-violet/40 flex items-center justify-center text-sm">🧙</div>
+              )}
+            </button>
+          ) : (
+            <Button size="sm" onClick={login}>
+              Sign in
+            </Button>
+          )}
           <Button variant="ghost" size="sm" onClick={() => navigate('/profile')}>
             Profile
           </Button>
