@@ -1,6 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from '@/context/AuthContext';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import { usePlayerStore } from '@/store/usePlayerStore';
 import { useCloudSync } from '@/hooks/useCloudSync';
+import WelcomePage from '@/pages/WelcomePage';
+import NicknameSetupPage from '@/pages/NicknameSetupPage';
 import HomePage from '@/pages/HomePage';
 import MultiplayerLobby from '@/pages/MultiplayerLobby';
 import BattlePage from '@/pages/BattlePage';
@@ -14,6 +17,20 @@ import TournamentPage from '@/pages/singleplayer/TournamentPage';
 
 function AppRoutes() {
   useCloudSync();
+  const { user, loading } = useAuth();
+  const username = usePlayerStore((s) => s.profile.username);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="font-display text-arcane-violet animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) return <WelcomePage />;
+  if (!username) return <NicknameSetupPage />;
+
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />

@@ -5,6 +5,7 @@ import type { WeaponId } from '@/lib/game/secondaryWeapons';
 export interface PlayerProfile {
   uid: string | null;
   displayName: string;
+  username: string | null;
   photoURL: string | null;
   elo: number;
   level: number;
@@ -21,14 +22,15 @@ export interface PlayerProfile {
 
 const FREE_COSMETICS = ['oak', 'apprentice', 'spark'];
 
-const defaultProfile: PlayerProfile = {
+export const defaultProfile: PlayerProfile = {
   uid: null,
   displayName: 'Apprentice',
+  username: null,
   photoURL: null,
   elo: 1000,
   level: 1,
   xp: 0,
-  coins: 10_000,
+  coins: 0,
   inventory: { glitch: 20, letterDrop: 20, slowCurse: 20, shield: 20 },
   equippedWeapon: 'glitch',
   cosmetics: { wand: 'oak', hat: 'apprentice', particles: 'spark' },

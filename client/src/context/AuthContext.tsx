@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth, signInWithGoogle, signOut } from '@/lib/firebase/auth';
 import { fetchProfile, saveProfile } from '@/lib/firebase/firestore';
-import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlayerStore, defaultProfile } from '@/store/usePlayerStore';
 
 interface AuthContextValue {
   user: User | null;
@@ -33,15 +33,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Load existing cloud profile
           setProfile({ ...cloudProfile, uid: firebaseUser.uid, displayName: firebaseUser.displayName ?? cloudProfile.displayName, photoURL: firebaseUser.photoURL });
         } else {
-          // First sign-in: save current local profile to cloud
-          const merged = {
-            ...profile,
+          // First sign-in: create a fresh profile (no inherited guest coins)
+          const freshProfile = {
+            ...defaultProfile,
             uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName ?? profile.displayName,
+            displayName: firebaseUser.displayName ?? defaultProfile.displayName,
             photoURL: firebaseUser.photoURL,
+            createdAt: Date.now(),
           };
-          setProfile(merged);
-          await saveProfile(firebaseUser.uid, { ...profile, ...merged });
+          setProfile(freshProfile);
+          await saveProfile(firebaseUser.uid, freshProfile);
         }
       }
 
