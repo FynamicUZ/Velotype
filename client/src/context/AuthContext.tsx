@@ -18,38 +18,78 @@ const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
 });
 
+// Firestore calls can hang indefinitely when its transport is blocked rather
+// than failing fast, so every startup call is bounded.
+const PROFILE_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error('Firestore timed out')), PROFILE_TIMEOUT_MS),
+    ),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const { setProfile, reset } = usePlayerStore();
 
   useEffect(() => {
+    // If Firebase Auth itself cannot reach the network, onAuthStateChanged may
+    // never fire at all. Release the splash screen regardless so the app is
+    // usable rather than stuck behind "Loading…".
+    const splashGuard = setTimeout(() => setLoading(false), PROFILE_TIMEOUT_MS + 4000);
+
     const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+      clearTimeout(splashGuard);
       setUser(firebaseUser);
 
-      if (firebaseUser) {
-        const cloudProfile = await fetchProfile(firebaseUser.uid);
-        if (cloudProfile) {
-          // Load existing cloud profile
-          setProfile({ ...cloudProfile, uid: firebaseUser.uid, displayName: firebaseUser.displayName ?? cloudProfile.displayName, photoURL: firebaseUser.photoURL });
-        } else {
-          // First sign-in: create a fresh profile (no inherited guest coins)
-          const freshProfile = {
+      try {
+        if (firebaseUser) {
+          const cloudProfile = await withTimeout(fetchProfile(firebaseUser.uid));
+          if (cloudProfile) {
+            // Load existing cloud profile
+            setProfile({ ...cloudProfile, uid: firebaseUser.uid, displayName: firebaseUser.displayName ?? cloudProfile.displayName, photoURL: firebaseUser.photoURL });
+          } else {
+            // First sign-in: create a fresh profile (no inherited guest coins)
+            const freshProfile = {
+              ...defaultProfile,
+              uid: firebaseUser.uid,
+              displayName: firebaseUser.displayName ?? defaultProfile.displayName,
+              photoURL: firebaseUser.photoURL,
+              createdAt: Date.now(),
+            };
+            setProfile(freshProfile);
+            await withTimeout(saveProfile(firebaseUser.uid, freshProfile));
+          }
+        }
+      } catch (err) {
+        // Firestore can be unreachable even when the user is online — its
+        // streaming transport is blocked by some networks, which surfaces as
+        // "client is offline". That must not strand the app on "Loading…":
+        // matches run over WebRTC and the signaling Worker, neither of which
+        // needs Firestore. Fall back to a local profile and carry on.
+        console.warn('[velotype] profile sync unavailable, continuing without it', err);
+        if (firebaseUser) {
+          setProfile({
             ...defaultProfile,
             uid: firebaseUser.uid,
             displayName: firebaseUser.displayName ?? defaultProfile.displayName,
             photoURL: firebaseUser.photoURL,
             createdAt: Date.now(),
-          };
-          setProfile(freshProfile);
-          await saveProfile(firebaseUser.uid, freshProfile);
+          });
         }
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     });
 
-    return unsub;
+    return () => {
+      clearTimeout(splashGuard);
+      unsub();
+    };
   }, []);
 
   async function login() {
