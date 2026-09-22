@@ -1,0 +1,30 @@
+# Velotype signaling server on Cloudflare Workers + Durable Objects.
+#
+# The game logic (rooms, matchmaking, battle royale) is imported directly from
+# ../server/src — this Worker only replaces the transport layer that used `ws`.
+# Do not delete ../server/src while this Worker is deployed.
+
+name = "velotype-signal"
+main = "src/index.ts"
+compatibility_date = "2026-09-01"
+
+# Comma-separated origins allowed to open a socket. Empty = allow all (dev only).
+[vars]
+ALLOWED_ORIGINS = "https://velotype.netlify.app"
+
+[[durable_objects.bindings]]
+name = "LOBBY"
+class_name = "Lobby"
+
+# SQLite-backed Durable Objects are the only kind available on the Workers free
+# plan, so this must stay `new_sqlite_classes` (not `new_classes`).
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Lobby"]
+
+# ../server/src imports `nanoid`, but its node_modules live next to this
+# Worker, not next to those files. This alias lets the bundler resolve it
+# without the Node server needing its own install. The browser build is used
+# because it takes randomness from the Web Crypto API, which workerd provides.
+[alias]
+nanoid = "./node_modules/nanoid/index.browser.js"

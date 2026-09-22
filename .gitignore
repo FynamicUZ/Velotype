@@ -1,6 +1,9 @@
 # Dependencies
 node_modules/
 
+# Wrangler local state (Cloudflare Worker dev)
+.wrangler/
+
 # Build output
 dist/
 dist-ssr/
