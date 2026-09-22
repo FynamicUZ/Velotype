@@ -225,7 +225,6 @@ function Avatar({ photoURL, username }: { photoURL: string | null; username: str
 function FriendCard({
   username,
   photoURL,
-  uid,
   isChallenging,
   onRemove,
   onChallenge,

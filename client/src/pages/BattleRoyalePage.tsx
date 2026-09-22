@@ -33,7 +33,7 @@ export default function BattleRoyalePage() {
   const [timerPct, setTimerPct] = useState(100);
 
   const inputRef = useRef<HTMLInputElement>(null);
-  const errorTimeout = useRef<ReturnType<typeof setTimeout>>();
+  const errorTimeout = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const iAmEliminated = myId ? eliminatedIds.has(myId) : false;
 
