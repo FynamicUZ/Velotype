@@ -9,8 +9,11 @@ main = "src/index.ts"
 compatibility_date = "2026-09-01"
 
 # Comma-separated origins allowed to open a socket. Empty = allow all (dev only).
+# An entry may use one leading or trailing `*`. Netlify branch and preview
+# deploys are served from <name>--velotype.netlify.app, and `npm run dev` from
+# localhost, so both need covering or those builds cannot reach the lobby.
 [vars]
-ALLOWED_ORIGINS = "https://velotype.netlify.app"
+ALLOWED_ORIGINS = "https://velotype.netlify.app,*--velotype.netlify.app,http://localhost:*,http://127.0.0.1:*"
 
 [[durable_objects.bindings]]
 name = "LOBBY"
