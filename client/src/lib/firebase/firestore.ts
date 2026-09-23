@@ -1,5 +1,5 @@
 import {
-  getFirestore,
+  initializeFirestore,
   doc,
   getDoc,
   setDoc,
@@ -16,7 +16,12 @@ import {
 import { firebaseApp } from './config';
 import type { PlayerProfile } from '@/store/usePlayerStore';
 
-export const db = getFirestore(firebaseApp);
+// Firestore's default transport streams over a long-lived connection, which ad
+// blockers, security suites and some ISPs silently drop — the SDK then reports
+// "the client is offline" on a perfectly good connection. Long polling uses
+// ordinary requests instead, which get through wherever HTTPS does, at the cost
+// of slightly higher latency on profile reads.
+export const db = initializeFirestore(firebaseApp, { experimentalForceLongPolling: true });
 
 // ─── Private profiles ────────────────────────────────────────────────────────
 
