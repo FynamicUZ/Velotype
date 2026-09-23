@@ -4,6 +4,7 @@ import { RoomManager } from '../../server/src/roomManager.js';
 import { BRRoomManager, type BRRoom } from '../../server/src/brRoomManager.js';
 import { Matchmaker } from '../../server/src/matchmaker.js';
 import type { ClientToServer, ServerToClient } from '../../server/src/types.js';
+import { PollingSocket } from './polling.js';
 
 const RATE_LIMIT_MSGS_PER_SEC = 50;
 
@@ -28,9 +29,13 @@ export class Lobby extends DurableObject {
   private brRooms = new BRRoomManager();
   private matchmaker = new Matchmaker();
   private rateState = new Map<WebSocket, { count: number; windowStart: number }>();
+  private polling = new Map<string, PollingSocket>();
   private cleanupTimer: ReturnType<typeof setInterval> | null = null;
 
-  fetch(_request: Request): Response {
+  fetch(request: Request): Response | Promise<Response> {
+    const url = new URL(request.url);
+    if (url.pathname.startsWith('/poll/')) return this.handlePoll(request, url);
+
     const pair = new WebSocketPair();
     const client = pair[0];
     const server = pair[1];
@@ -46,6 +51,65 @@ export class Lobby extends DurableObject {
     return new Response(null, { status: 101, webSocket: client });
   }
 
+  // ── HTTP polling transport ──────────────────────────────────────────────
+  //
+  // Same lobby, same message handlers; only the carrier differs. Sessions are
+  // identified by an opaque id the client keeps for the life of the connection.
+
+  private async handlePoll(request: Request, url: URL): Promise<Response> {
+    const json = (body: unknown, status = 200): Response =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      });
+
+    this.startCleanup();
+
+    if (url.pathname === '/poll/connect') {
+      const socket = new PollingSocket(crypto.randomUUID());
+      this.polling.set(socket.id, socket);
+      return json({ sessionId: socket.id });
+    }
+
+    const sessionId = url.searchParams.get('s') ?? '';
+    const socket = this.polling.get(sessionId);
+    if (!socket) return json({ error: 'unknown session' }, 404);
+    socket.lastSeen = Date.now();
+
+    if (url.pathname === '/poll/send') {
+      const body = await request.text();
+      this.onMessage(socket as unknown as WebSocket, body);
+      return json({ ok: true });
+    }
+
+    if (url.pathname === '/poll/recv') {
+      // Held open briefly so messages arrive promptly without busy polling.
+      const messages = await socket.receive(20_000);
+      return json({ messages, closed: socket.readyState === 3 });
+    }
+
+    if (url.pathname === '/poll/close') {
+      this.dropPollingSession(socket);
+      return json({ ok: true });
+    }
+
+    return json({ error: 'not found' }, 404);
+  }
+
+  private dropPollingSession(socket: PollingSocket): void {
+    this.polling.delete(socket.id);
+    socket.close();
+    this.onDisconnect(socket as unknown as WebSocket);
+  }
+
+  /** A client that stops polling has gone away, so treat it as a disconnect. */
+  private expirePollingSessions(maxIdleMs = 45_000): void {
+    const now = Date.now();
+    for (const socket of [...this.polling.values()]) {
+      if (now - socket.lastSeen > maxIdleMs) this.dropPollingSession(socket);
+    }
+  }
+
   // ── plumbing ────────────────────────────────────────────────────────────
 
   private startCleanup(): void {
@@ -53,7 +117,8 @@ export class Lobby extends DurableObject {
     this.cleanupTimer = setInterval(() => {
       this.rooms.cleanup();
       this.brRooms.cleanup();
-    }, 60_000);
+      this.expirePollingSessions();
+    }, 15_000);
   }
 
   private send(socket: WebSocket, msg: ServerToClient): void {

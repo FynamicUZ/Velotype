@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { connectSignaling, type SignalTransport } from '@/lib/net/signalTransport';
 
 const SIGNAL_URL =
   (import.meta.env.VITE_SIGNAL_URL as string | undefined) ?? 'ws://localhost:3001';
@@ -36,12 +37,12 @@ interface BrStoreState {
 }
 
 export const useBrStore = create<BrStoreState>((set, get) => {
-  let ws: WebSocket | null = null;
+  let ws: SignalTransport | null = null;
   let myNameCache = '';
   const subscribers = new Set<(msg: BrInboundMsg) => void>();
 
   function wsSend(msg: unknown): void {
-    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    ws?.send(JSON.stringify(msg));
   }
 
   function notify(msg: BrInboundMsg): void {
@@ -115,17 +116,15 @@ export const useBrStore = create<BrStoreState>((set, get) => {
     }
   }
 
-  function connectWs(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      ws = new WebSocket(SIGNAL_URL);
-      ws.onopen = () => resolve();
-      ws.onerror = () => reject(new Error('Connection failed'));
-      ws.onmessage = (e) => {
-        try { handleMsg(JSON.parse(e.data as string)); } catch {}
-      };
-      ws.onclose = () => {
-        if (get().status !== 'idle') set({ status: 'idle', errorMsg: 'Connection closed' });
-      };
+  // Falls back to HTTP polling where WebSockets are blocked — see
+  // lib/net/signalTransport.
+  async function connectWs(): Promise<void> {
+    ws = await connectSignaling(SIGNAL_URL);
+    ws.onMessage((data) => {
+      try { handleMsg(JSON.parse(data)); } catch {}
+    });
+    ws.onClose(() => {
+      if (get().status !== 'idle') set({ status: 'idle', errorMsg: 'Connection closed' });
     });
   }
 

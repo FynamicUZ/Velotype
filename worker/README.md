@@ -22,6 +22,31 @@ Sockets are accepted with `accept()` rather than the WebSocket Hibernation API,
 because the managers hold their state in memory — the object must stay resident
 while players are connected.
 
+## Two ways in
+
+Players connect over a WebSocket when their network allows it. Some networks
+pass ordinary HTTPS but silently drop the upgrade — ad blockers, security
+suites, and filtering of `workers.dev`, which is widely blocklisted because it
+is abused for phishing. Those players fall back to HTTP polling:
+
+| route | purpose |
+|---|---|
+| `POST /poll/connect` | opens a session, returns its id |
+| `POST /poll/send?s=<id>` | one client→server message, body is the JSON |
+| `GET /poll/recv?s=<id>` | long poll, held up to 20s, returns queued messages |
+| `POST /poll/close?s=<id>` | ends the session |
+
+`PollingSocket` (`src/polling.ts`) presents the same `send`/`readyState` surface
+as a WebSocket, so the room, matchmaking and battle royale code is identical for
+both carriers — a polling player and a WebSocket player land in the same lobby
+and can play each other. A session that stops polling for 45s is treated as a
+disconnect. The client picks the carrier itself in
+`client/src/lib/net/signalTransport.ts`, trying the WebSocket first with a 5s
+timeout.
+
+`/selftest` reports which layers work from a given browser, which is the fastest
+way to tell a blocked network apart from a real bug.
+
 ## Deploy
 
 ```bash
