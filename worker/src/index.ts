@@ -1,4 +1,5 @@
 import { Lobby } from './lobby.js';
+import { SELFTEST_HTML } from './selftest.js';
 
 export { Lobby };
 
@@ -24,6 +25,12 @@ export default {
 
     // Plain HTTP: health check, same paths the Node server answered.
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
+      if (url.pathname === '/selftest') {
+        return new Response(SELFTEST_HTML, {
+          status: 200,
+          headers: { 'content-type': 'text/html; charset=utf-8' },
+        });
+      }
       if (url.pathname === '/healthz' || url.pathname === '/') {
         return new Response('ok', { status: 200, headers: { 'content-type': 'text/plain' } });
       }
@@ -41,7 +48,10 @@ export default {
       .map((s) => s.trim())
       .filter(Boolean);
     const origin = request.headers.get('Origin');
-    if (allowed.length > 0 && !originAllowed(origin, allowed)) {
+    // The /selftest page lives on this same origin, so it has to be allowed to
+    // open a socket back to us.
+    if (allowed.length > 0 && origin !== url.origin && !originAllowed(origin, allowed)) {
+      console.warn(`[velotype] refused websocket from origin: ${origin ?? '(none)'}`);
       // Name the rejected origin: the browser only surfaces "failed", which
       // makes a mismatch here very expensive to diagnose from the client side.
       return new Response(`Origin not allowed: ${origin ?? '(none)'}`, { status: 403 });
@@ -49,6 +59,7 @@ export default {
 
     // Every player shares one lobby, so all rooms and the matchmaking queue
     // live in a single Durable Object instance.
+    console.log(`[velotype] accepted websocket from origin: ${origin ?? '(none)'}`);
     const id = env.LOBBY.idFromName('global');
     return env.LOBBY.get(id).fetch(request);
   },
