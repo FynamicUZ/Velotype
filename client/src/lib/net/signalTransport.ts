@@ -76,7 +76,7 @@ class PollingTransport implements SignalTransport {
       try {
         // The server holds this open until it has something to say, so this is
         // a long poll rather than a busy loop.
-        const res = await fetch(`${this.base}/poll/recv?s=${this.sessionId}`);
+        const res = await fetch(`${this.base}/poll/recv?s=${this.sessionId}`, { cache: 'no-store' });
         if (!res.ok) throw new Error(`recv ${res.status}`);
         const body = (await res.json()) as { messages?: string[]; closed?: boolean };
         failures = 0;
@@ -86,8 +86,8 @@ class PollingTransport implements SignalTransport {
         if (body.closed) break;
       } catch {
         // A blip shouldn't kill the session, but a dead server should.
-        if (++failures >= 3) break;
-        await new Promise((r) => setTimeout(r, 1000));
+        if (++failures >= 5) break;
+        await new Promise((r) => setTimeout(r, 400 * failures));
       }
     }
     if (this.running) this.fireClose();
@@ -150,12 +150,32 @@ function tryWebSocket(url: string): Promise<WebSocket | null> {
   });
 }
 
+/**
+ * Opens the polling session, retrying a few times.
+ *
+ * On networks with no UDP path the browser's first attempt can die with
+ * ERR_QUIC_PROTOCOL_ERROR, because Chromium reaches Cloudflare over HTTP/3
+ * before it knows QUIC is unusable here. It demotes the broken QUIC session
+ * after a failure, so a retry goes out over TCP and succeeds — but only if we
+ * bother to retry.
+ */
 async function startPolling(url: string): Promise<PollingTransport> {
   const base = toHttp(url);
-  const res = await fetch(`${base}/poll/connect`, { method: 'POST' });
-  if (!res.ok) throw new Error(`signaling unavailable (${res.status})`);
-  const { sessionId } = (await res.json()) as { sessionId: string };
-  return new PollingTransport(base, sessionId);
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 400 * attempt));
+    try {
+      const res = await fetch(`${base}/poll/connect`, { method: 'POST', cache: 'no-store' });
+      if (!res.ok) throw new Error(`signaling unavailable (${res.status})`);
+      const { sessionId } = (await res.json()) as { sessionId: string };
+      return new PollingTransport(base, sessionId);
+    } catch (e) {
+      lastError = e;
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error('signaling unavailable');
 }
 
 export async function connectSignaling(url: string): Promise<SignalTransport> {
