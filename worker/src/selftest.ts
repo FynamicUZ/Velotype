@@ -44,12 +44,18 @@ export const SELFTEST_HTML = `<!doctype html>
     <div class="val" id="rtc">testing…</div>
   </div>
 
+  <div class="row">
+    <div class="label">4 — Firestore reachability (account sync)</div>
+    <div class="val" id="fs">testing…</div>
+  </div>
+
   <div class="verdict" id="verdict">Running…</div>
 </main>
 <script>
   const httpEl = document.getElementById('http');
   const wsEl = document.getElementById('ws');
   const rtcEl = document.getElementById('rtc');
+  const fsEl = document.getElementById('fs');
   const verdictEl = document.getElementById('verdict');
   let httpOk = null, wsOk = null, rtcOk = null;
 
@@ -72,6 +78,13 @@ export const SELFTEST_HTML = `<!doctype html>
         'The whole domain looks blocked from this network.';
     }
   }
+
+  (function () {
+    const started = Date.now();
+    fetch('https://firestore.googleapis.com/v1/projects/velotype-6f667/databases/(default)/documents/users', { mode: 'no-cors', cache: 'no-store' })
+      .then(() => { fsEl.innerHTML = '<span class="ok">OK — reached Firestore in ' + (Date.now() - started) + 'ms</span>'; })
+      .catch((e) => { fsEl.innerHTML = '<span class="bad">BLOCKED — ' + e.message + ' (account sync cannot work here)</span>'; });
+  })();
 
   fetch('/healthz')
     .then((r) => { httpOk = r.ok; httpEl.innerHTML = r.ok

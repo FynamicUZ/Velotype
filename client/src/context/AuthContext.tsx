@@ -20,7 +20,10 @@ const AuthContext = createContext<AuthContextValue>({
 
 // Firestore calls can hang indefinitely when its transport is blocked rather
 // than failing fast, so every startup call is bounded.
-const PROFILE_TIMEOUT_MS = 8000;
+// Long polling makes the first profile read slower than a streaming one, and a
+// network that forced the fallback is usually the slow kind, so this is
+// generous — it exists to stop the app hanging, not to police latency.
+const PROFILE_TIMEOUT_MS = 20000;
 
 function withTimeout<T>(promise: Promise<T>): Promise<T> {
   return Promise.race([
