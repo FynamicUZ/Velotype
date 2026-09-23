@@ -56,6 +56,8 @@ export default function BattlePage() {
   const words = useGameStore((s) => s.words);
   const enemy = useGameStore((s) => s.enemy);
   const localHP = useGameStore((s) => s.localHP);
+  const localMaxHP = useGameStore((s) => s.localMaxHP);
+  const syncOpponentHP = useGameStore((s) => s.syncOpponentHP);
   const opponentEffects = useGameStore((s) => s.opponentEffects);
   const equippedWeapon = useGameStore((s) => s.equippedWeapon);
   const weaponCooldownEndsAt = useGameStore((s) => s.weaponCooldownEndsAt);
@@ -64,11 +66,13 @@ export default function BattlePage() {
   const applyOpponentEffect = useGameStore((s) => s.applyOpponentEffect);
   const activateShield = useGameStore((s) => s.activateShield);
   const finishBattleAction = useGameStore((s) => s.finishBattle);
+  const finishByHpComparison = useGameStore((s) => s.finishByHpComparison);
 
   const mpSend = useMpStore((s) => s.send);
   const mpOnMessage = useMpStore((s) => s.onMessage);
   const mpGoFinished = useMpStore((s) => s.goFinished);
   const mpCleanup = useMpStore((s) => s.cleanup);
+  const mpChannel = useMpStore((s) => s.channel);
 
   const isMp = navState?.mode === 'mp-ranked' || navState?.mode === 'mp-friend';
   const finishedSentRef = useRef(false);
@@ -215,13 +219,47 @@ export default function BattlePage() {
         if (m.weaponId === 'glitch') applyOpponentEffect('glitch', w.effectMs);
         else if (m.weaponId === 'letterDrop') applyOpponentEffect('letterDrop', w.effectMs);
         else if (m.weaponId === 'slowCurse') applyOpponentEffect('slow', w.effectMs);
+      } else if (m.type === 'hp') {
+        syncOpponentHP(m.hp, m.maxHp);
       } else if (m.type === 'finished') {
-        if (useGameStore.getState().phase !== 'RESULTS') {
-          finishBattleAction();
+        if (useGameStore.getState().phase === 'RESULTS') return;
+        if (m.reason === 'words-done') {
+          // The opponent ran out of words first — both sides settle on HP.
+          finishByHpComparison();
+        } else {
+          // They hit zero HP or forfeited, so the round is ours.
+          finishBattleAction('win');
         }
       }
     });
-  }, [isMp, mpOnMessage, damageLocal, applyOpponentEffect, finishBattleAction]);
+  }, [
+    isMp,
+    mpOnMessage,
+    damageLocal,
+    applyOpponentEffect,
+    syncOpponentHP,
+    finishBattleAction,
+    finishByHpComparison,
+  ]);
+
+  // Our own HP is the authoritative copy, so push it to the opponent on every
+  // change instead of letting them infer it from damage packets.
+  useEffect(() => {
+    if (!isMp) return;
+    if (phase !== 'BATTLE' && phase !== 'COUNTDOWN') return;
+    mpSend({ type: 'hp', hp: localHP, maxHp: localMaxHP });
+  }, [isMp, phase, localHP, localMaxHP, mpSend]);
+
+  // If the peer link drops mid-round the opponent can no longer lose on their
+  // own terms, so award the round rather than leaving the battle hanging.
+  useEffect(() => {
+    if (!isMp) return;
+    if (phase !== 'BATTLE' && phase !== 'COUNTDOWN') return;
+    if (mpChannel === null) {
+      finishedSentRef.current = true;
+      finishBattleAction('win');
+    }
+  }, [isMp, phase, mpChannel, finishBattleAction]);
 
   useEffect(() => {
     if (!isMp) return;
@@ -232,10 +270,19 @@ export default function BattlePage() {
   }, [isMp, localHP, mpSend]);
 
   useEffect(() => {
-    if (phase === 'BATTLE' && engine.done && navState?.mode === 'solo-practice') {
+    if (phase !== 'BATTLE' || !engine.done) return;
+    if (navState?.mode === 'solo-practice') {
       useGameStore.getState().finishBattle();
+      return;
     }
-  }, [engine.done, phase, navState]);
+    if (isMp && !finishedSentRef.current) {
+      // Word limit reached with both mages alive: tell the opponent, then let
+      // both sides settle the round on remaining HP.
+      finishedSentRef.current = true;
+      mpSend({ type: 'finished', reason: 'words-done' });
+      finishByHpComparison();
+    }
+  }, [engine.done, phase, navState, isMp, mpSend, finishByHpComparison]);
 
   useEffect(() => {
     return () => {

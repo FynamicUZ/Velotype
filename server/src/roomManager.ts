@@ -45,7 +45,9 @@ export class RoomManager {
     return null;
   }
 
-  cleanup(maxAgeMs = 10 * 60 * 1000): void {
+  // Rooms outlive a single match now that players rematch without leaving, so
+  // keep the code valid long enough for a dropped friend to rejoin.
+  cleanup(maxAgeMs = 60 * 60 * 1000): void {
     const now = Date.now();
     for (const [code, room] of this.rooms) {
       if (now - room.createdAt > maxAgeMs) {

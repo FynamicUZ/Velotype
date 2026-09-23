@@ -16,6 +16,7 @@ export interface PeerOptions {
   signaling: SignalingClient;
   isHost: boolean;
   onChannelOpen: (channel: RTCDataChannel) => void;
+  onChannelClose?: () => void;
   onConnectionStateChange?: (state: RTCPeerConnectionState) => void;
 }
 
@@ -26,6 +27,7 @@ export class PeerConnectionManager {
   private iceBuffer: RTCIceCandidateInit[] = [];
 
   private opts: PeerOptions;
+  private closedByUs = false;
 
   constructor(opts: PeerOptions) {
     this.opts = opts;
@@ -55,6 +57,9 @@ export class PeerConnectionManager {
     this.dc = dc;
     dc.binaryType = 'arraybuffer';
     dc.onopen = () => this.opts.onChannelOpen(dc);
+    dc.onclose = () => {
+      if (!this.closedByUs) this.opts.onChannelClose?.();
+    };
   }
 
   async initiateOffer(): Promise<void> {
@@ -104,6 +109,7 @@ export class PeerConnectionManager {
   }
 
   close(): void {
+    this.closedByUs = true;
     try {
       this.dc?.close();
     } catch {}

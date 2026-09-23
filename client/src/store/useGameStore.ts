@@ -5,6 +5,7 @@ import type { EnemyDef } from '@/lib/game/botAI';
 
 export type BattlePhase = 'IDLE' | 'CONNECTING' | 'LOBBY' | 'COUNTDOWN' | 'BATTLE' | 'RESULTS';
 export type BattleMode = 'solo-practice' | 'singleplayer' | 'mp-ranked' | 'mp-friend';
+export type BattleResult = 'win' | 'loss' | 'draw';
 
 export interface FloatingDamage {
   id: number;
@@ -38,6 +39,7 @@ interface GameStoreState {
 
   enemy: EnemyDef | null;
   opponentName: string;
+  result: BattleResult | null;
 
   startedAt: number | null;
   damageNumbers: FloatingDamage[];
@@ -65,6 +67,7 @@ interface GameStoreState {
   }) => void;
   damageOpponent: (amount: number) => void;
   damageLocal: (amount: number, isHeavy?: boolean) => void;
+  syncOpponentHP: (hp: number, maxHp: number) => void;
   pushFloatingDamage: (d: Omit<FloatingDamage, 'id'>) => void;
   clearFloatingDamage: (id: number) => void;
   recordWordResult: (correctChars: number, keystrokes: number, failed: boolean, bestStreak: number) => void;
@@ -73,7 +76,8 @@ interface GameStoreState {
   applyOpponentEffect: (effect: 'glitch' | 'letterDrop' | 'slow', durationMs: number) => void;
   activateShield: () => void;
   consumeShield: () => boolean;
-  finishBattle: () => void;
+  finishBattle: (result?: BattleResult) => void;
+  finishByHpComparison: () => void;
   resetBattle: () => void;
 }
 
@@ -99,6 +103,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   opponentMaxHP: 200,
   enemy: null,
   opponentName: 'Opponent',
+  result: null,
   startedAt: null,
   damageNumbers: [],
   damageNumberSeq: 0,
@@ -124,6 +129,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       opponentMaxHP: cfg.opponentMaxHP,
       enemy: cfg.enemy ?? null,
       opponentName: cfg.opponentName ?? cfg.enemy?.name ?? 'Opponent',
+      result: null,
       equippedWeapon: cfg.equippedWeapon ?? null,
       shieldActive: false,
       opponentEffects: { glitchUntil: 0, letterDropUntil: 0, slowUntil: 0 },
@@ -135,6 +141,9 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
   damageOpponent: (amount) => {
     const { opponentHP, mode } = get();
     const isMp = mode === 'mp-friend' || mode === 'mp-ranked';
+    // In multiplayer the opponent owns their own HP: this is an optimistic
+    // local prediction held just above zero, and the authoritative value
+    // arrives via syncOpponentHP. Only that value can end the match.
     const minHp = isMp ? 1 : 0;
     const newHP = Math.max(minHp, opponentHP - amount);
     set((s) => ({
@@ -144,7 +153,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (amount > 0) {
       get().pushFloatingDamage({ side: 'opponent', amount });
     }
-    if (!isMp && newHP <= 0) get().finishBattle();
+    if (!isMp && newHP <= 0) get().finishBattle('win');
   },
 
   damageLocal: (amount, isHeavy) => {
@@ -159,7 +168,13 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     if (dmg > 0) {
       get().pushFloatingDamage({ side: 'local', amount: dmg, isHeavy });
     }
-    if (newHP <= 0) get().finishBattle();
+    if (newHP <= 0) get().finishBattle('loss');
+  },
+
+  syncOpponentHP: (hp, maxHp) => {
+    if (get().phase === 'RESULTS') return;
+    set({ opponentHP: Math.max(0, hp), opponentMaxHP: maxHp });
+    if (hp <= 0) get().finishBattle('win');
   },
 
   pushFloatingDamage: (d) =>
@@ -207,14 +222,27 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
     return active;
   },
 
-  finishBattle: () => {
+  finishBattle: (result) => {
     const s = get();
     if (s.phase === 'RESULTS') return;
     const duration = s.startedAt ? performance.now() - s.startedAt : 0;
     set({
       phase: 'RESULTS',
+      result: result ?? s.result ?? (s.localHP > 0 ? 'win' : 'loss'),
       localStats: { ...s.localStats, durationMs: duration },
     });
+  },
+
+  // The word list is a round limit, not the win condition. If it runs out with
+  // both mages still standing, the healthier one takes the round.
+  finishByHpComparison: () => {
+    const s = get();
+    if (s.phase === 'RESULTS') return;
+    const localPct = s.localMaxHP > 0 ? s.localHP / s.localMaxHP : 0;
+    const oppPct = s.opponentMaxHP > 0 ? s.opponentHP / s.opponentMaxHP : 0;
+    const result =
+      localPct > oppPct ? 'win' : localPct < oppPct ? 'loss' : 'draw';
+    get().finishBattle(result);
   },
 
   resetBattle: () =>
@@ -229,6 +257,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       opponentMaxHP: 200,
       enemy: null,
       opponentName: 'Opponent',
+      result: null,
       startedAt: null,
       damageNumbers: [],
       localStats: { ...emptyStats },

@@ -48,6 +48,8 @@ interface MpStoreState {
 
   goInGame: () => void;
   goFinished: () => void;
+  /** Return to the room after a match without tearing down the peer link. */
+  returnToLobby: () => void;
   cleanup: () => void;
 }
 
@@ -111,6 +113,11 @@ export const useMpStore = create<MpStoreState>((set, get) => {
     const peer = new PeerConnectionManager({
       signaling: sig,
       isHost,
+      onChannelClose: () => {
+        const s = get();
+        if (s.status === 'idle' || s.status === 'closed') return;
+        set({ status: 'closed', errorMsg: 'Opponent left the room', channel: null });
+      },
       onChannelOpen: (dc) => {
         const channel = new GameChannel(dc);
         channel.onMessage((m) => handleDcMessage(m));
@@ -203,6 +210,13 @@ export const useMpStore = create<MpStoreState>((set, get) => {
 
     goInGame: () => set({ status: 'in-game' }),
     goFinished: () => set({ status: 'finished' }),
+
+    returnToLobby: () => {
+      // Keep signaling, peer connection and channel alive — only the battle is
+      // over, the room is not.
+      if (get().channel) set({ status: 'lobby', errorMsg: null });
+      else set({ status: 'closed', errorMsg: 'Opponent left the room' });
+    },
 
     cleanup: () => {
       try {

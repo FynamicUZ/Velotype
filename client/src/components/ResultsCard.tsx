@@ -5,13 +5,14 @@ import type { BattleStats } from '@/store/useGameStore';
 
 interface Props {
   won: boolean;
+  draw?: boolean;
   stats: BattleStats;
   rewards?: { coins?: number; xp?: number; eloDelta?: number };
   onPlayAgain?: () => void;
   onHome: () => void;
 }
 
-export function ResultsCard({ won, stats, rewards, onPlayAgain, onHome }: Props) {
+export function ResultsCard({ won, draw, stats, rewards, onPlayAgain, onHome }: Props) {
   const wpm = computeWpm(stats);
   const accuracy = stats.totalKeystrokes > 0
     ? Math.round((stats.correctChars / stats.totalKeystrokes) * 100)
@@ -23,11 +24,17 @@ export function ResultsCard({ won, stats, rewards, onPlayAgain, onHome }: Props)
         <div
           className="font-display text-5xl mb-2"
           style={{
-            color: won ? '#a3e635' : '#fb7185',
-            textShadow: `0 0 32px ${won ? 'rgba(163,230,53,0.7)' : 'rgba(251,113,133,0.7)'}`,
+            color: draw ? '#facc15' : won ? '#a3e635' : '#fb7185',
+            textShadow: `0 0 32px ${
+              draw
+                ? 'rgba(250,204,21,0.7)'
+                : won
+                ? 'rgba(163,230,53,0.7)'
+                : 'rgba(251,113,133,0.7)'
+            }`,
           }}
         >
-          {won ? 'VICTORY' : 'DEFEAT'}
+          {draw ? 'DRAW' : won ? 'VICTORY' : 'DEFEAT'}
         </div>
       </div>
 
@@ -58,7 +65,7 @@ export function ResultsCard({ won, stats, rewards, onPlayAgain, onHome }: Props)
       <div className="flex gap-3 justify-center">
         {onPlayAgain && (
           <Button variant="primary" onClick={onPlayAgain}>
-            Play Again
+            ⚔️ Rematch
           </Button>
         )}
         <Button variant="secondary" onClick={onHome}>

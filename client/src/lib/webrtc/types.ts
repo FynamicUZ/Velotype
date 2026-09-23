@@ -32,6 +32,13 @@ export type DCMessage =
   | { type: 'hello'; info: PeerInfo }
   | { type: 'ready' }
   | { type: 'start'; seed: number; totalWords: number }
+  // Host-owned room settings, pushed so the guest sees the real word limit.
+  | { type: 'settings'; totalWords: number }
   | { type: 'damage'; amount: number; tier: number; streak: number }
   | { type: 'weapon'; weaponId: WeaponId }
-  | { type: 'finished'; reason: 'hp-zero' | 'forfeit' };
+  // Authoritative HP broadcast: each player owns their own HP, so the opponent
+  // bar is synced from this rather than inferred from damage (shields, timing
+  // and packet order would otherwise let the two sides drift apart).
+  | { type: 'hp'; hp: number; maxHp: number }
+  | { type: 'finished'; reason: 'hp-zero' | 'forfeit' | 'words-done' }
+  | { type: 'rematch' };

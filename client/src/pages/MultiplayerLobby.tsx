@@ -9,7 +9,20 @@ import { randomSeed } from '@/lib/utils/seededRandom';
 import { spriteForHat, emojiForWand } from '@/lib/game/cosmeticAssets';
 import type { PeerInfo } from '@/lib/webrtc/types';
 
-const TOTAL_WORDS_MP = 200;
+const WORD_COUNT_OPTIONS = [50, 100, 200, 300, 500] as const;
+const DEFAULT_TOTAL_WORDS = 200;
+const WORD_COUNT_KEY = 'velotype:mp-total-words';
+
+function loadPreferredWordCount(): number {
+  try {
+    const raw = window.localStorage.getItem(WORD_COUNT_KEY);
+    const n = raw ? Number(raw) : NaN;
+    if (WORD_COUNT_OPTIONS.includes(n as (typeof WORD_COUNT_OPTIONS)[number])) return n;
+  } catch {
+    // Storage can be blocked (private windows, hardened browsers) — fall through.
+  }
+  return DEFAULT_TOTAL_WORDS;
+}
 
 interface LobbyNavState {
   autoCreate?: boolean;
@@ -41,6 +54,17 @@ export default function MultiplayerLobby() {
   const goInGame = useMpStore((s) => s.goInGame);
 
   const [roomInput, setRoomInput] = useState('');
+  const [totalWords, setTotalWords] = useState(loadPreferredWordCount);
+
+  const chooseWordCount = (n: number) => {
+    setTotalWords(n);
+    send({ type: 'settings', totalWords: n });
+    try {
+      window.localStorage.setItem(WORD_COUNT_KEY, String(n));
+    } catch {
+      // Remembering the choice is a convenience, never a requirement.
+    }
+  };
   const didAutoConnect = useRef(false);
 
   const myInfoRef = useRef<PeerInfo>({
@@ -78,8 +102,18 @@ export default function MultiplayerLobby() {
     equippedWeapon: profile.equippedWeapon,
   };
 
+  // Push the host's word limit to the guest as soon as they appear.
+  useEffect(() => {
+    if (!isHost || !peerInfo) return;
+    send({ type: 'settings', totalWords });
+  }, [isHost, peerInfo, totalWords, send]);
+
   useEffect(() => {
     return onMessage((m) => {
+      if (m.type === 'settings') {
+        if (!useMpStore.getState().isHost) setTotalWords(m.totalWords);
+        return;
+      }
       if (m.type === 'start') {
         goInGame();
         navigate('/battle', {
@@ -105,13 +139,13 @@ export default function MultiplayerLobby() {
 
   const handleStartGame = () => {
     const seed = randomSeed();
-    send({ type: 'start', seed, totalWords: TOTAL_WORDS_MP });
+    send({ type: 'start', seed, totalWords });
     goInGame();
     navigate('/battle', {
       state: {
         mode: mode === 'ranked' ? 'mp-ranked' : 'mp-friend',
         seed,
-        totalWords: TOTAL_WORDS_MP,
+        totalWords,
         opponentName: peerInfo?.name ?? 'Opponent',
         opponentInfo: peerInfo,
       },
@@ -165,6 +199,41 @@ export default function MultiplayerLobby() {
             wand={peerInfo ? emojiForWand(peerInfo.cosmetics.wand) : ''}
           />
         </div>
+
+        <Card className="p-4 mb-4">
+          <div className="text-xs uppercase text-white/40 tracking-wider mb-2">
+            Word Limit
+          </div>
+          {isHost ? (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {WORD_COUNT_OPTIONS.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => chooseWordCount(n)}
+                    className={`px-4 py-2 rounded-xl font-mono text-sm border transition ${
+                      totalWords === n
+                        ? 'border-arcane-cyan text-arcane-cyan bg-arcane-cyan/10'
+                        : 'border-arcane-border text-white/60 hover:border-white/40'
+                    }`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-white/40 mt-3">
+                The round ends when one mage's HP hits zero. If the words run out
+                first, the mage with more HP left wins.
+              </p>
+            </>
+          ) : (
+            <p className="text-white/60 text-sm">
+              <span className="font-mono text-arcane-cyan">{totalWords}</span> — the
+              host chooses the limit. First mage to drop to zero HP loses.
+            </p>
+          )}
+        </Card>
 
         {isHost ? (
           <Button glow onClick={handleStartGame} disabled={!peerInfo}>
