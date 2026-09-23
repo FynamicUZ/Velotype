@@ -2,11 +2,16 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { auth, signInWithGoogle, signOut } from '@/lib/firebase/auth';
 import { fetchProfile, saveProfile } from '@/lib/firebase/firestore';
-import { usePlayerStore, defaultProfile } from '@/store/usePlayerStore';
+import { usePlayerStore, defaultProfile, type PlayerProfile } from '@/store/usePlayerStore';
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  /**
+   * True once the cloud profile has actually been read. Until then nothing may
+   * be written back, or a local-only state would overwrite the real profile.
+   */
+  profileSynced: boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -14,6 +19,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   loading: true,
+  profileSynced: false,
   login: async () => {},
   logout: async () => {},
 });
@@ -37,6 +43,7 @@ function withTimeout<T>(promise: Promise<T>): Promise<T> {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileSynced, setProfileSynced] = useState(false);
   const { setProfile, reset } = usePlayerStore();
 
   useEffect(() => {
@@ -52,6 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         if (firebaseUser) {
           const cloudProfile = await withTimeout(fetchProfile(firebaseUser.uid));
+          setProfileSynced(true);
           if (cloudProfile) {
             // Load existing cloud profile
             setProfile({ ...cloudProfile, uid: firebaseUser.uid, displayName: firebaseUser.displayName ?? cloudProfile.displayName, photoURL: firebaseUser.photoURL });
@@ -70,19 +78,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       } catch (err) {
         // Firestore can be unreachable even when the user is online — its
-        // streaming transport is blocked by some networks, which surfaces as
-        // "client is offline". That must not strand the app on "Loading…":
-        // matches run over WebRTC and the signaling Worker, neither of which
-        // needs Firestore. Fall back to a local profile and carry on.
-        console.warn('[velotype] profile sync unavailable, continuing without it', err);
+        // transport is blocked or throttled by some networks. That must not
+        // strand the app on "Loading…": matches run over WebRTC and the
+        // signaling Worker, neither of which needs Firestore.
+        //
+        // Crucially, keep whatever the local store already holds. It is
+        // persisted to localStorage, so it carries this player's real progress;
+        // replacing it with defaults would show their XP as zero and then let
+        // the cloud sync write those zeros over their actual profile.
+        console.warn('[velotype] profile sync unavailable, keeping local progress', err);
+        setProfileSynced(false);
         if (firebaseUser) {
-          setProfile({
-            ...defaultProfile,
+          // Only identity fields, and only ones that actually have a value:
+          // setProfile spreads the patch, so an undefined would erase the
+          // stored name rather than leave it alone.
+          const identity: Partial<PlayerProfile> = {
             uid: firebaseUser.uid,
-            displayName: firebaseUser.displayName ?? defaultProfile.displayName,
             photoURL: firebaseUser.photoURL,
-            createdAt: Date.now(),
-          });
+          };
+          if (firebaseUser.displayName) identity.displayName = firebaseUser.displayName;
+          setProfile(identity);
         }
       } finally {
         setLoading(false);
@@ -108,10 +123,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut();
     reset();
     setUser(null);
+    setProfileSynced(false);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
+    <AuthContext.Provider value={{ user, loading, profileSynced, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

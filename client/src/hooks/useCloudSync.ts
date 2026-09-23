@@ -4,11 +4,14 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { saveProfile } from '@/lib/firebase/firestore';
 
 export function useCloudSync() {
-  const { user } = useAuth();
+  const { user, profileSynced } = useAuth();
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!user) return;
+    // Never write before the cloud profile has been read: on a network where
+    // the read failed, the store still holds local-only state, and saving it
+    // would overwrite the player's real profile with it.
+    if (!user || !profileSynced) return;
 
     const unsub = usePlayerStore.subscribe((state) => {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -21,5 +24,5 @@ export function useCloudSync() {
       unsub();
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [user]);
+  }, [user, profileSynced]);
 }
