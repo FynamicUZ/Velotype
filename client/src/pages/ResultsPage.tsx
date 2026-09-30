@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ResultsCard } from '@/components/ResultsCard';
+import { ResultsCard, type ResultsAction } from '@/components/ResultsCard';
+import { getWorld, nextFightInWorld } from '@/lib/game/enemies';
 import { useGameStore } from '@/store/useGameStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useMpStore } from '@/store/useMpStore';
@@ -15,6 +16,7 @@ export default function ResultsPage() {
   const enemy = useGameStore((s) => s.enemy);
   const resetBattle = useGameStore((s) => s.resetBattle);
 
+  const profile = usePlayerStore((s) => s.profile);
   const addCoins = usePlayerStore((s) => s.addCoins);
   const addXp = usePlayerStore((s) => s.addXp);
   const applyEloDelta = usePlayerStore((s) => s.applyEloDelta);
@@ -60,11 +62,15 @@ export default function ResultsPage() {
     return undefined;
   }, [mode, won, draw, enemy]);
 
+  // Landing here without a finished battle means the page was opened directly.
+  // Checked once on mount: later the battle is cleared on the way out, and that
+  // must not bounce us to the front page.
   useEffect(() => {
-    if (phase !== 'RESULTS') {
-      navigate('/', { replace: true });
-      return;
-    }
+    if (useGameStore.getState().phase !== 'RESULTS') navigate('/', { replace: true });
+  }, [navigate]);
+
+  useEffect(() => {
+    if (phase !== 'RESULTS') return;
     if (granted) return;
     setGranted(true);
 
@@ -115,7 +121,7 @@ export default function ResultsPage() {
       if (m.type === 'rematch') {
         backToLobby();
       } else if (m.type === 'start') {
-        resetBattle();
+            resetBattle();
         mpGoInGame();
         navigate('/battle', {
           state: {
@@ -140,6 +146,101 @@ export default function ResultsPage() {
     mpPeerInfo,
   ]);
 
+  const goHome = useCallback(() => {
+    if (isMp) mpCleanup();
+    resetBattle();
+    navigate('/');
+  }, [isMp, mpCleanup, resetBattle, navigate]);
+
+  // Where a fight lets out depends on where it started: a campaign fight
+  // returns to its world, not to the front page.
+  const actions = useMemo<ResultsAction[]>(() => {
+    if (isMp) {
+      const list: ResultsAction[] = [];
+      if (canRematch) {
+        list.push({
+          label: '⚔️ Rematch',
+          variant: 'primary',
+          onClick: () => {
+            mpSend({ type: 'rematch' });
+            backToLobby();
+          },
+        });
+      }
+      list.push({ label: 'Home', onClick: goHome });
+      return list;
+    }
+
+    if (mode === 'singleplayer' && enemy) {
+      const world = getWorld(enemy.worldId);
+      const list: ResultsAction[] = [];
+      const defeated = won
+        ? [...profile.spProgress.defeatedFighters, enemy.id]
+        : profile.spProgress.defeatedFighters;
+      const next = world ? nextFightInWorld(world, defeated, enemy.id) : undefined;
+
+      const startFight = (enemyId: string) => {
+            resetBattle();
+        navigate('/battle', { state: { mode: 'singleplayer', enemyId }, replace: true });
+      };
+
+      if (won && next) {
+        list.push({
+          label: `Next: ${next.name}`,
+          variant: 'primary',
+          onClick: () => startFight(next.id),
+        });
+      }
+      if (!won) {
+        list.push({
+          label: '⚔️ Try Again',
+          variant: 'primary',
+          onClick: () => startFight(enemy.id),
+        });
+      }
+      if (world) {
+        list.push({
+          label: `← ${world.name}`,
+          variant: won && next ? 'secondary' : 'primary',
+          onClick: () => {
+                    resetBattle();
+            navigate(`/sp/world/${world.id}`, { replace: true });
+          },
+        });
+      }
+      list.push({ label: 'Home', variant: 'ghost', onClick: goHome });
+      return list;
+    }
+
+    if (mode === 'solo-practice') {
+      return [
+        {
+          label: '↻ Practice Again',
+          variant: 'primary',
+          onClick: () => {
+                    resetBattle();
+            navigate('/battle', { state: { mode: 'solo-practice' }, replace: true });
+          },
+        },
+        { label: 'Home', onClick: goHome },
+      ];
+    }
+
+    return [{ label: 'Home', onClick: goHome }];
+  }, [
+    isMp,
+    canRematch,
+    mpSend,
+    backToLobby,
+    goHome,
+    mode,
+    enemy,
+    won,
+    profile.spProgress.defeatedFighters,
+    resetBattle,
+    navigate,
+  ]);
+
   if (phase !== 'RESULTS') return null;
 
   return (
@@ -149,19 +250,7 @@ export default function ResultsPage() {
         draw={draw}
         stats={stats}
         rewards={rewards}
-        onPlayAgain={
-          canRematch
-            ? () => {
-                mpSend({ type: 'rematch' });
-                backToLobby();
-              }
-            : undefined
-        }
-        onHome={() => {
-          if (isMp) mpCleanup();
-          resetBattle();
-          navigate('/');
-        }}
+        actions={actions}
       />
       {isMp && !canRematch && (
         <p className="text-sm text-white/50">Your opponent left the room.</p>

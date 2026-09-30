@@ -15,6 +15,12 @@ export default function WorldMapPage() {
   const bestWave = useRunStore((s) => s.bestWave);
   const titlesWon = useRunStore((s) => s.titlesWon);
   const survivalRun = useRunStore((s) => s.survival);
+  const tournamentRun = useRunStore((s) => s.tournament);
+  const activeTournament =
+    tournamentRun && tournamentRun.status === 'ready' ? tournamentRun : null;
+  const activeTier = activeTournament
+    ? TOURNAMENT_TIERS.find((t) => t.id === activeTournament.tierId)
+    : undefined;
 
   return (
     <div className="min-h-screen p-6 max-w-5xl mx-auto">
@@ -72,7 +78,9 @@ export default function WorldMapPage() {
             See how deep you can get.
           </p>
           <Button variant="secondary" onClick={() => navigate('/sp/survival')}>
-            {survivalRun ? 'Resume Run' : 'Enter Survival'}
+            {survivalRun && survivalRun.status === 'ready'
+              ? `Resume — wave ${survivalRun.wave}`
+              : 'Enter Survival'}
           </Button>
         </Card>
 
@@ -89,6 +97,21 @@ export default function WorldMapPage() {
           <p className="text-sm text-white/60 mb-3">
             Climb a ladder of eight fighters. Every match is best of three.
           </p>
+          {activeTournament && activeTier && (
+            <button
+              type="button"
+              onClick={() => navigate(`/sp/tournament/${activeTier.id}`)}
+              className="w-full mb-3 rounded-xl border border-arcane-violet/60 bg-arcane-violet/10 px-3 py-2 text-left hover:border-arcane-violet transition"
+            >
+              <div className="text-xs uppercase tracking-wider text-arcane-violet mb-0.5">
+                In progress — resume
+              </div>
+              <div className="text-sm">
+                {activeTier.name} · rank {8 - activeTournament.index} ·{' '}
+                {activeTournament.matchesWon}/8 won
+              </div>
+            </button>
+          )}
           <div className="flex flex-col gap-2">
             {TOURNAMENT_TIERS.slice(0, Math.max(1, unlocked)).map((t) => (
               <button
@@ -100,6 +123,9 @@ export default function WorldMapPage() {
                 <span className="flex items-center gap-2">
                   {t.name}
                   {titlesWon.includes(t.id) && <span className="text-arcane-lime text-xs">✓</span>}
+                  {activeTournament?.tierId === t.id && (
+                    <span className="text-arcane-violet text-xs">· in progress</span>
+                  )}
                 </span>
                 <span className="text-xs text-white/40 font-mono">
                   {t.entryFee > 0 ? `${t.entryFee} coins` : 'free'}

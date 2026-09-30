@@ -63,7 +63,13 @@ export default function TournamentPage() {
     startTournament(tierId);
   };
 
-  const leave = () => {
+  const canEnter = !run || run.status !== 'ready' || run.tierId === tierId;
+
+  // Leaving keeps the run: a tournament is eight matches and is meant to be
+  // played across sittings. Only an explicit abandon throws it away.
+  const goBack = () => navigate('/sp');
+
+  const abandon = () => {
     endTournament();
     navigate('/sp');
   };
@@ -86,8 +92,34 @@ export default function TournamentPage() {
   // ── not entered ───────────────────────────────────────────────────────────
   if (!active) {
     const canAfford = profile.coins >= tier.entryFee;
+    const elsewhere = run && run.status === 'ready' ? run : null;
+    const elsewhereTier = elsewhere ? getTournamentTier(elsewhere.tierId) : undefined;
     return (
       <Shell onBack={() => navigate('/sp')}>
+        {elsewhere && elsewhereTier && (
+          <Card className="p-5 mb-4 border-arcane-orange/60">
+            <p className="text-sm text-white/80 mb-1">
+              You are {elsewhere.matchesWon} match
+              {elsewhere.matchesWon === 1 ? '' : 'es'} into the{' '}
+              <span className="text-arcane-gold">{elsewhereTier.name}</span>.
+            </p>
+            <p className="text-xs text-white/50 mb-3">
+              Entering this one abandons that run — you only hold one tournament
+              place at a time.
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                onClick={() => navigate(`/sp/tournament/${elsewhere.tierId}`)}
+              >
+                Resume {elsewhereTier.name}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={() => endTournament()}>
+                Abandon it
+              </Button>
+            </div>
+          </Card>
+        )}
         <Card className="p-8 text-center" glow>
           <div className="text-5xl mb-3">🏆</div>
           <h1 className="font-display text-3xl mb-1">{tier.name}</h1>
@@ -121,8 +153,12 @@ export default function TournamentPage() {
               <span className="text-arcane-lime">Free entry</span>
             )}
           </p>
-          <Button glow onClick={enter} disabled={!canAfford}>
-            {canAfford ? 'Enter Tournament' : 'Not enough coins'}
+          <Button glow onClick={enter} disabled={!canAfford || !canEnter}>
+            {!canAfford
+              ? 'Not enough coins'
+              : canEnter
+                ? 'Enter Tournament'
+                : 'Finish or abandon your other run first'}
           </Button>
         </Card>
       </Shell>
@@ -136,7 +172,7 @@ export default function TournamentPage() {
   if (active.status === 'over') {
     const beaten = ladder[active.index];
     return (
-      <Shell onBack={leave}>
+      <Shell onBack={abandon}>
         <Card className="p-8 text-center" glow>
           <div className="font-display text-4xl mb-2 text-arcane-rose">KNOCKED OUT</div>
           <p className="text-white/60 mb-6">
@@ -149,7 +185,7 @@ export default function TournamentPage() {
           </p>
           <div className="flex gap-3 justify-center">
             <Button onClick={() => { endTournament(); }}>Try Again</Button>
-            <Button variant="secondary" onClick={leave}>
+            <Button variant="secondary" onClick={abandon}>
               World Map
             </Button>
           </div>
@@ -161,7 +197,7 @@ export default function TournamentPage() {
   // ── champion ──────────────────────────────────────────────────────────────
   if (active.status === 'champion') {
     return (
-      <Shell onBack={leave}>
+      <Shell onBack={abandon}>
         <Card className="p-8 text-center" glow>
           <div className="text-6xl mb-3">🏆</div>
           <div className="font-display text-4xl mb-2 text-arcane-gold">CHAMPION</div>
@@ -174,7 +210,7 @@ export default function TournamentPage() {
           </div>
           <div className="flex gap-3 justify-center">
             <Button onClick={() => { endTournament(); }}>Defend the Title</Button>
-            <Button variant="secondary" onClick={leave}>
+            <Button variant="secondary" onClick={abandon}>
               World Map
             </Button>
           </div>
@@ -185,7 +221,7 @@ export default function TournamentPage() {
 
   // ── mid-tournament ────────────────────────────────────────────────────────
   return (
-    <Shell onBack={leave}>
+    <Shell onBack={goBack}>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="font-display text-2xl">{tier.name}</h1>
@@ -265,6 +301,20 @@ export default function TournamentPage() {
           })}
         </div>
       </Card>
+      <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
+        <p className="text-xs text-white/40">
+          ✓ Progress is saved after every match — you can leave and pick this up
+          later.
+        </p>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" onClick={goBack}>
+            Continue Later
+          </Button>
+          <Button variant="ghost" size="sm" onClick={abandon}>
+            Abandon
+          </Button>
+        </div>
+      </div>
     </Shell>
   );
 }

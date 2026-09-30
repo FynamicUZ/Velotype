@@ -43,7 +43,10 @@ export default function SurvivalPage() {
 
   const beginRun = () => startSurvival(maxHp);
 
-  const leave = () => {
+  // Stepping away keeps the run and its carried health; only Retire ends it.
+  const goBack = () => navigate('/sp');
+
+  const retire = () => {
     endSurvival();
     navigate('/sp');
   };
@@ -98,7 +101,7 @@ export default function SurvivalPage() {
   if (run.status === 'over') {
     const isBest = run.wavesCleared > 0 && run.wave >= bestWave;
     return (
-      <Shell onBack={leave}>
+      <Shell onBack={retire}>
         <Card className="p-8 text-center" glow>
           <div className="font-display text-4xl mb-2 text-arcane-rose">YOU FELL</div>
           <p className="text-white/60 mb-6">
@@ -112,7 +115,7 @@ export default function SurvivalPage() {
           {isBest && <Badge color="gold">🏆 New personal best</Badge>}
           <div className="flex gap-3 justify-center mt-6">
             <Button onClick={beginRun}>Run Again</Button>
-            <Button variant="secondary" onClick={leave}>
+            <Button variant="secondary" onClick={retire}>
               World Map
             </Button>
           </div>
@@ -127,7 +130,7 @@ export default function SurvivalPage() {
   const accent = kind === 'boss' ? 'rose' : kind === 'bodyguard' ? 'orange' : 'cyan';
 
   return (
-    <Shell onBack={leave}>
+    <Shell onBack={goBack}>
       <Card className="p-6 mb-4">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -176,7 +179,10 @@ export default function SurvivalPage() {
           <span className="text-arcane-cyan">+{reward.xp} XP</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="ghost" onClick={leave}>
+          <Button variant="ghost" onClick={goBack}>
+            Continue Later
+          </Button>
+          <Button variant="ghost" onClick={retire}>
             Retire
           </Button>
           <Button glow onClick={fightWave}>
@@ -185,7 +191,8 @@ export default function SurvivalPage() {
         </div>
       </div>
       <p className="text-xs text-white/40 mt-4 text-center">
-        Retiring keeps everything you have earned so far.
+        ✓ The run is saved between waves — leave and come back whenever.
+        Retiring ends it for good and keeps everything you have earned.
       </p>
     </Shell>
   );

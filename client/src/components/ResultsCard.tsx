@@ -3,16 +3,22 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import type { BattleStats } from '@/store/useGameStore';
 
+export interface ResultsAction {
+  label: string;
+  onClick: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost';
+}
+
 interface Props {
   won: boolean;
   draw?: boolean;
   stats: BattleStats;
   rewards?: { coins?: number; xp?: number; eloDelta?: number };
-  onPlayAgain?: () => void;
-  onHome: () => void;
+  /** Buttons under the card, in order. The caller decides where each leads. */
+  actions: ResultsAction[];
 }
 
-export function ResultsCard({ won, draw, stats, rewards, onPlayAgain, onHome }: Props) {
+export function ResultsCard({ won, draw, stats, rewards, actions }: Props) {
   const wpm = computeWpm(stats);
   const accuracy = stats.totalKeystrokes > 0
     ? Math.round((stats.correctChars / stats.totalKeystrokes) * 100)
@@ -62,15 +68,12 @@ export function ResultsCard({ won, draw, stats, rewards, onPlayAgain, onHome }: 
         </div>
       )}
 
-      <div className="flex gap-3 justify-center">
-        {onPlayAgain && (
-          <Button variant="primary" onClick={onPlayAgain}>
-            ⚔️ Rematch
+      <div className="flex gap-3 justify-center flex-wrap">
+        {actions.map((a) => (
+          <Button key={a.label} variant={a.variant ?? 'secondary'} onClick={a.onClick}>
+            {a.label}
           </Button>
-        )}
-        <Button variant="secondary" onClick={onHome}>
-          Home
-        </Button>
+        ))}
       </div>
     </Card>
   );

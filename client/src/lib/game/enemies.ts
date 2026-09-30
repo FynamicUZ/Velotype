@@ -139,3 +139,20 @@ export const TRAINING_DUMMY: EnemyDef = {
   sprite: '🪵',
   flavor: 'It does not fight back. Practice freely.',
 };
+
+/**
+ * The next fight to offer after one ends: the first undefeated enemy in the
+ * world that is actually unlocked, following the fighters -> bodyguard -> boss
+ * order the fight list uses.
+ */
+export function nextFightInWorld(
+  world: World,
+  defeatedIds: string[],
+  excludeId?: string,
+): EnemyDef | undefined {
+  const beaten = (e: EnemyDef) => defeatedIds.includes(e.id);
+  const candidates: EnemyDef[] = [...world.fighters];
+  if (world.fighters.every(beaten)) candidates.push(world.bodyguard);
+  if (beaten(world.bodyguard)) candidates.push(world.boss);
+  return candidates.find((e) => !beaten(e) && e.id !== excludeId);
+}
