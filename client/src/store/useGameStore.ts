@@ -4,7 +4,13 @@ import type { WeaponId } from '@/lib/game/secondaryWeapons';
 import type { EnemyDef } from '@/lib/game/botAI';
 
 export type BattlePhase = 'IDLE' | 'CONNECTING' | 'LOBBY' | 'COUNTDOWN' | 'BATTLE' | 'RESULTS';
-export type BattleMode = 'solo-practice' | 'singleplayer' | 'mp-ranked' | 'mp-friend';
+export type BattleMode =
+  | 'solo-practice'
+  | 'singleplayer'
+  | 'mp-ranked'
+  | 'mp-friend'
+  | 'survival'
+  | 'tournament';
 export type BattleResult = 'win' | 'loss' | 'draw';
 
 export interface FloatingDamage {
@@ -60,6 +66,8 @@ interface GameStoreState {
     seed: number;
     words: QueuedWord[];
     localMaxHP: number;
+    /** Starting HP, when it differs from max — survival carries damage over. */
+    localStartHP?: number;
     opponentMaxHP: number;
     enemy?: EnemyDef | null;
     opponentName?: string;
@@ -123,7 +131,7 @@ export const useGameStore = create<GameStoreState>((set, get) => ({
       mode: cfg.mode,
       seed: cfg.seed,
       words: cfg.words,
-      localHP: cfg.localMaxHP,
+      localHP: Math.min(cfg.localStartHP ?? cfg.localMaxHP, cfg.localMaxHP),
       localMaxHP: cfg.localMaxHP,
       opponentHP: cfg.opponentMaxHP,
       opponentMaxHP: cfg.opponentMaxHP,

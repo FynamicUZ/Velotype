@@ -30,12 +30,20 @@ import type { PeerInfo } from '@/lib/webrtc/types';
 interface BattleNavState {
   mode: BattleMode;
   enemyId?: string;
+  /** Survival and tournament opponents are generated, so they travel inline. */
+  enemyDef?: EnemyDef;
   seed?: number;
   totalWords?: number;
   opponentName?: string;
   opponentMaxHP?: number;
   opponentInfo?: PeerInfo | null;
   equippedWeapon?: WeaponId | null;
+  /** Survival carries damage between waves instead of healing you up. */
+  startHP?: number;
+  /** Where to go when the fight is over, for multi-fight runs. */
+  returnTo?: string;
+  /** Badge shown during the fight, e.g. "WAVE 7" or "ROUND 2 · 1-0". */
+  subtitle?: string;
 }
 
 export default function BattlePage() {
@@ -75,6 +83,7 @@ export default function BattlePage() {
   const mpChannel = useMpStore((s) => s.channel);
 
   const isMp = navState?.mode === 'mp-ranked' || navState?.mode === 'mp-friend';
+  const isRun = navState?.mode === 'survival' || navState?.mode === 'tournament';
   const finishedSentRef = useRef(false);
 
   const [now, setNow] = useState(performance.now());
@@ -96,27 +105,29 @@ export default function BattlePage() {
     let oppMax = navState.opponentMaxHP ?? 200;
     let oppName = navState.opponentName ?? 'Opponent';
 
-    if (mode === 'singleplayer' || mode === 'solo-practice') {
-      if (mode === 'solo-practice') {
-        resolvedEnemy = TRAINING_DUMMY;
-        oppMax = 999_999;
-        oppName = TRAINING_DUMMY.name;
-      } else if (navState.enemyId) {
-        const e = getEnemyById(navState.enemyId);
-        if (e) {
-          resolvedEnemy = e;
-          oppMax = getEnemyHP(e.level, e.kind);
-          oppName = e.name;
-        }
+    if (mode === 'solo-practice') {
+      resolvedEnemy = TRAINING_DUMMY;
+      oppMax = 999_999;
+      oppName = TRAINING_DUMMY.name;
+    } else if (mode === 'singleplayer' && navState.enemyId) {
+      const e = getEnemyById(navState.enemyId);
+      if (e) {
+        resolvedEnemy = e;
+        oppMax = getEnemyHP(e.level, e.kind);
+        oppName = e.name;
       }
+    } else if (isRun && navState.enemyDef) {
+      resolvedEnemy = navState.enemyDef;
+      oppMax = getEnemyHP(resolvedEnemy.level, resolvedEnemy.kind);
+      oppName = resolvedEnemy.name;
     }
 
     const localMaxHP =
-      mode === 'singleplayer' ? 100 + profile.level * 20 : 200;
+      mode === 'singleplayer' || isRun ? 100 + profile.level * 20 : 200;
 
     const seed = navState.seed ?? randomSeed();
     const totalWords =
-      navState.totalWords ?? (mode === 'solo-practice' ? 120 : 50);
+      navState.totalWords ?? (mode === 'solo-practice' ? 120 : isRun ? 150 : 50);
     const generated = generateWordSequence(seed, {
       totalWords,
       levelOffset: profile.level - 1,
@@ -127,12 +138,13 @@ export default function BattlePage() {
       seed,
       words: generated,
       localMaxHP,
+      localStartHP: navState.startHP,
       opponentMaxHP: oppMax,
       enemy: resolvedEnemy,
       opponentName: oppName,
       equippedWeapon: navState.equippedWeapon ?? profile.equippedWeapon,
     });
-  }, [navState, phase, profile, startBattle, navigate]);
+  }, [navState, phase, profile, startBattle, navigate, isRun]);
 
   const battling = phase === 'BATTLE';
 
@@ -202,7 +214,10 @@ export default function BattlePage() {
   const engine = useTypingEngine({
     words,
     enabled: battling,
-    playerLevel: navState?.mode === 'singleplayer' ? profile.level : undefined,
+    // Survival and tournament face campaign-scaled enemies, so they get the
+    // same level damage bonus the campaign does.
+    playerLevel:
+      navState?.mode === 'singleplayer' || isRun ? profile.level : undefined,
     timeoutMultiplier: localSlowed ? 0.7 : 1,
     onWordComplete: handleWordComplete,
   });
@@ -275,6 +290,10 @@ export default function BattlePage() {
       useGameStore.getState().finishBattle();
       return;
     }
+    if (isRun) {
+      finishByHpComparison();
+      return;
+    }
     if (isMp && !finishedSentRef.current) {
       // Word limit reached with both mages alive: tell the opponent, then let
       // both sides settle the round on remaining HP.
@@ -282,7 +301,7 @@ export default function BattlePage() {
       mpSend({ type: 'finished', reason: 'words-done' });
       finishByHpComparison();
     }
-  }, [engine.done, phase, navState, isMp, mpSend, finishByHpComparison]);
+  }, [engine.done, phase, navState, isMp, isRun, mpSend, finishByHpComparison]);
 
   useEffect(() => {
     return () => {
@@ -291,10 +310,11 @@ export default function BattlePage() {
   }, [resetBattle]);
 
   useEffect(() => {
-    if (phase === 'RESULTS') {
-      navigate('/results', { replace: true });
-    }
-  }, [phase, navigate]);
+    if (phase !== 'RESULTS') return;
+    // Runs settle their own outcome on the page that owns the run, so the
+    // generic results screen is skipped for them.
+    navigate(isRun ? navState?.returnTo ?? '/sp' : '/results', { replace: true });
+  }, [phase, navigate, isRun, navState]);
 
   if (!navState) return null;
 
@@ -317,6 +337,11 @@ export default function BattlePage() {
       mpGoFinished();
       mpCleanup();
     }
+    if (isRun) {
+      // Give the round to the opponent rather than silently voiding the run.
+      finishBattleAction('loss');
+      return;
+    }
     resetBattle();
     navigate('/');
   };
@@ -325,12 +350,13 @@ export default function BattlePage() {
     <div className="min-h-screen flex flex-col p-6 gap-6">
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="sm" onClick={handleForfeit}>
-          ← Forfeit
+          {isRun ? '← Surrender' : '← Forfeit'}
         </Button>
         <div className="flex items-center gap-3">
           <Badge color="violet">Lvl {profile.level}</Badge>
           {navState.mode === 'mp-ranked' && <Badge color="gold">RANKED</Badge>}
           {navState.mode === 'mp-friend' && <Badge color="cyan">FRIEND</Badge>}
+          {navState.subtitle && <Badge color="violet">{navState.subtitle}</Badge>}
           {navState.mode === 'singleplayer' && enemy && (
             <Badge color={enemy.kind === 'boss' ? 'rose' : 'orange'}>
               {enemy.kind.toUpperCase()} · Lvl {enemy.level}

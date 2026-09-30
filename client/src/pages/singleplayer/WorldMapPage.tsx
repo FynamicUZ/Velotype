@@ -4,12 +4,17 @@ import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { WORLDS } from '@/lib/game/enemies';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { useRunStore } from '@/store/useRunStore';
+import { TOURNAMENT_TIERS } from '@/lib/game/runOpponents';
 import clsx from 'clsx';
 
 export default function WorldMapPage() {
   const navigate = useNavigate();
   const profile = usePlayerStore((s) => s.profile);
   const unlocked = profile.spProgress.worldsUnlocked;
+  const bestWave = useRunStore((s) => s.bestWave);
+  const titlesWon = useRunStore((s) => s.titlesWon);
+  const survivalRun = useRunStore((s) => s.survival);
 
   return (
     <div className="min-h-screen p-6 max-w-5xl mx-auto">
@@ -57,26 +62,51 @@ export default function WorldMapPage() {
 
       <div className="grid md:grid-cols-2 gap-4 mt-6">
         <Card className="p-5">
-          <h3 className="font-display text-lg mb-2">Survival</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-2xl">💀</span>
+            <h3 className="font-display text-lg">Survival</h3>
+            {bestWave > 0 && <Badge color="gold">Best: wave {bestWave}</Badge>}
+          </div>
           <p className="text-sm text-white/60 mb-3">
-            Endless waves. HP doesn't restore between fights. Coins per wave survived.
+            Endless waves. Health carries between fights and barely recovers.
+            See how deep you can get.
           </p>
           <Button variant="secondary" onClick={() => navigate('/sp/survival')}>
-            Enter Survival
+            {survivalRun ? 'Resume Run' : 'Enter Survival'}
           </Button>
         </Card>
+
         <Card className="p-5">
-          <h3 className="font-display text-lg mb-2">Tournament</h3>
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-2xl">🏆</span>
+            <h3 className="font-display text-lg">Tournament</h3>
+            {titlesWon.length > 0 && (
+              <Badge color="gold">
+                {titlesWon.length} title{titlesWon.length > 1 ? 's' : ''}
+              </Badge>
+            )}
+          </div>
           <p className="text-sm text-white/60 mb-3">
-            8-bot bracket. Win three fights, claim the prize.
+            Climb a ladder of eight fighters. Every match is best of three.
           </p>
-          <Button
-            variant="secondary"
-            disabled={unlocked < 1}
-            onClick={() => navigate(`/sp/tournament/${unlocked}`)}
-          >
-            Enter Tournament
-          </Button>
+          <div className="flex flex-col gap-2">
+            {TOURNAMENT_TIERS.slice(0, Math.max(1, unlocked)).map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => navigate(`/sp/tournament/${t.id}`)}
+                className="flex items-center justify-between rounded-xl border border-arcane-border px-3 py-2 text-left text-sm hover:border-arcane-violet/60 transition"
+              >
+                <span className="flex items-center gap-2">
+                  {t.name}
+                  {titlesWon.includes(t.id) && <span className="text-arcane-lime text-xs">✓</span>}
+                </span>
+                <span className="text-xs text-white/40 font-mono">
+                  {t.entryFee > 0 ? `${t.entryFee} coins` : 'free'}
+                </span>
+              </button>
+            ))}
+          </div>
         </Card>
       </div>
     </div>
