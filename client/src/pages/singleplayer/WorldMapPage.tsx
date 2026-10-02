@@ -74,7 +74,7 @@ export default function WorldMapPage() {
             {bestWave > 0 && <Badge color="gold">Best: wave {bestWave}</Badge>}
           </div>
           <p className="text-sm text-white/60 mb-3">
-            Endless waves. Health carries between fights and barely recovers.
+            Endless waves. Health carries between fights and never recovers.
             See how deep you can get.
           </p>
           <Button variant="secondary" onClick={() => navigate('/sp/survival')}>

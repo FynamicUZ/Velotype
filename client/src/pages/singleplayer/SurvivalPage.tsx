@@ -73,8 +73,9 @@ export default function SurvivalPage() {
           <div className="text-5xl mb-3">💀</div>
           <h1 className="font-display text-3xl mb-3">Survival</h1>
           <p className="text-white/60 mb-2">
-            Endless waves, one after another. Your health carries from fight to
-            fight and only a sliver comes back between them.
+            Endless waves, one after another. Whatever health you walk out of a
+            fight with is what you walk into the next one with — nothing heals
+            between waves.
           </p>
           <p className="text-white/60 mb-6">
             There is no winning — only how far you get before you fall.
@@ -82,6 +83,7 @@ export default function SurvivalPage() {
           <div className="flex justify-center gap-2 mb-6 flex-wrap">
             <Badge color="cyan">Every 5th wave: bodyguard</Badge>
             <Badge color="rose">Every 10th: boss</Badge>
+            <Badge color="rose">No healing between waves</Badge>
             <Badge color="gold">Rewards scale with depth</Badge>
           </div>
           {bestWave > 0 && (
@@ -141,14 +143,12 @@ export default function SurvivalPage() {
         </div>
 
         <RunHpBar hp={run.hp} maxHp={run.maxHp} />
-        {run.lastOutcome === 'win' && run.lastHeal > 0 && (
-          <p className="text-xs text-arcane-lime mt-2">
-            +{run.lastHeal} HP recovered after the last fight
-          </p>
-        )}
+        <p className="text-xs text-white/40 mt-2">
+          Carried over from the last fight — nothing heals between waves.
+        </p>
         {run.hp <= run.maxHp * 0.25 && (
           <p className="text-xs text-arcane-rose mt-2">
-            You are badly hurt. There is no full heal coming.
+            You are badly hurt, and this is all you have left.
           </p>
         )}
       </Card>
@@ -191,8 +191,9 @@ export default function SurvivalPage() {
         </div>
       </div>
       <p className="text-xs text-white/40 mt-4 text-center">
-        ✓ The run is saved between waves — leave and come back whenever.
-        Retiring ends it for good and keeps everything you have earned.
+        ✓ The run is saved between waves — leave and come back whenever. Your
+        health will be exactly as you left it. Retiring ends the run for good
+        and keeps everything you have earned.
       </p>
     </Shell>
   );

@@ -9,8 +9,6 @@ import {
 } from '@/lib/game/runOpponents';
 import { randomSeed } from '@/lib/utils/seededRandom';
 
-/** Fraction of max HP handed back after clearing a survival wave. */
-export const SURVIVAL_WAVE_HEAL = 0.12;
 /** Rounds needed to take a tournament match — best of three. */
 export const ROUNDS_TO_WIN = 2;
 
@@ -26,7 +24,6 @@ export interface SurvivalRun {
   xpEarned: number;
   status: RunStatus;
   lastOutcome: 'win' | 'loss' | null;
-  lastHeal: number;
 }
 
 export interface TournamentRun {
@@ -88,7 +85,6 @@ export const useRunStore = create<RunStoreState>()(
             xpEarned: 0,
             status: 'ready',
             lastOutcome: null,
-            lastHeal: 0,
           },
         }),
 
@@ -98,28 +94,26 @@ export const useRunStore = create<RunStoreState>()(
 
         if (!won) {
           set({
-            survival: { ...run, hp: 0, status: 'over', lastOutcome: 'loss', lastHeal: 0 },
+            survival: { ...run, hp: 0, status: 'over', lastOutcome: 'loss' },
           });
           return;
         }
 
-        // A sliver of health back per wave — enough to keep a good run alive,
-        // never enough to undo the damage of a bad one.
-        const heal = Math.round(run.maxHp * SURVIVAL_WAVE_HEAL);
-        const healed = Math.min(run.maxHp, Math.max(1, hpLeft) + heal);
+        // Nothing is healed between waves: whatever you walk out with is what
+        // you walk into the next fight with.
+        const carried = Math.min(run.maxHp, Math.max(1, hpLeft));
         const reward = survivalWaveReward(run.wave);
 
         set((s) => ({
           survival: {
             ...run,
             wave: run.wave + 1,
-            hp: healed,
+            hp: carried,
             wavesCleared: run.wavesCleared + 1,
             coinsEarned: run.coinsEarned + reward.coins,
             xpEarned: run.xpEarned + reward.xp,
             status: 'ready',
             lastOutcome: 'win',
-            lastHeal: healed - Math.max(1, hpLeft),
           },
           unclaimedCoins: s.unclaimedCoins + reward.coins,
           unclaimedXp: s.unclaimedXp + reward.xp,
